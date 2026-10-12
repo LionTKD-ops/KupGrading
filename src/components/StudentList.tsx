@@ -1,4 +1,4 @@
-import { Users, ChevronRight, Trash2, Search } from 'lucide-react';
+import { Users, ChevronRight, Trash2, Search, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import type { Student } from '@/lib/supabase';
 
@@ -6,17 +6,29 @@ type Props = {
   students: Student[];
   loading: boolean;
   onSelect: (student: Student) => void;
+  onEdit: (student: Student) => void;
   onDelete: (id: string) => void;
 };
 
-export default function StudentList({ students, loading, onSelect, onDelete }: Props) {
+const expiryNote = (expiry: string | null) => {
+  if (!expiry) return null;
+  const expired = expiry < new Date().toISOString().split('T')[0];
+  return (
+    <p className={`truncate text-xs ${expired ? 'font-semibold text-red-600' : 'text-slate-400'}`}>
+      {expired ? 'Membership expired' : 'Membership expires'} {expiry}
+    </p>
+  );
+};
+
+export default function StudentList({ students, loading, onSelect, onEdit, onDelete }: Props) {
   const [query, setQuery] = useState('');
 
   const filtered = students.filter((c) => {
     const q = query.toLowerCase();
     return (
       c.student_name.toLowerCase().includes(q) ||
-      c.candidate_id.toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q) ||
+      (c.bt_membership_number ?? '').toLowerCase().includes(q) ||
       c.current_rank.toLowerCase().includes(q)
     );
   });
@@ -37,7 +49,7 @@ export default function StudentList({ students, loading, onSelect, onDelete }: P
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, ID, or grade..."
+              placeholder="Search by name, email, BT number or grade..."
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none placeholder:text-slate-400"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -51,11 +63,11 @@ export default function StudentList({ students, loading, onSelect, onDelete }: P
       ) : filtered.length === 0 ? (
         <div className="px-5 py-8 text-center text-sm text-slate-400">
           {students.length === 0
-            ? 'No students yet. Import from CSV or Google Sheets above.'
+            ? 'No students yet. Add a student above or import from CSV or Google Sheets.'
             : 'No matches found.'}
         </div>
       ) : (
-        <div className="max-h-72 divide-y divide-slate-50 overflow-y-auto">
+        <div className="max-h-[32rem] divide-y divide-slate-50 overflow-y-auto">
           {filtered.map((student) => (
             <div
               key={student.id}
@@ -70,10 +82,22 @@ export default function StudentList({ students, loading, onSelect, onDelete }: P
                   {student.student_name}
                 </p>
                 <p className="truncate text-xs text-slate-500">
-                  {student.candidate_id} · {student.current_rank} → {student.target_rank}
+                  {[student.email, student.current_rank, student.bt_membership_number && `BT `].filter(Boolean).join(' · ')}
                 </p>
+                {expiryNote(student.membership_expiry)}
               </div>
               <button
+                aria-label={`Edit ${student.student_name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(student);
+                }}
+                className="rounded-lg p-1.5 text-slate-300 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                aria-label={`Delete ${student.student_name}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(student.id);

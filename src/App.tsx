@@ -7,12 +7,13 @@ import FeedbackSummary from '@/components/FeedbackSummary';
 import ExportActions from '@/components/ExportActions';
 import SavedEvaluations from '@/components/SavedEvaluations';
 import StudentImport from '@/components/StudentImport';
+import StudentForm from '@/components/StudentForm';
 import StudentList from '@/components/StudentList';
 import LiveSessionModal from '@/components/LiveSessionModal';
 import LiveSessionView from '@/components/LiveSessionView';
 import AdminView from '@/components/AdminView';
 import SessionPlanning from '@/components/SessionPlanning';
-import { supabase, supabaseConfigured, type Evaluation, type Student, type ExaminerScores } from '@/lib/supabase';
+import { supabase, supabaseConfigured, type Evaluation, type Student, type StudentInput, type ExaminerScores } from '@/lib/supabase';
 import { buildModules, GRADES, getFeedbackTier, getVerdict } from '@/data/rubrics';
 import { demoStudents, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
@@ -37,6 +38,11 @@ const emptyProfile: ProfileData = {
   date: today,
 };
 
+const nextGrade = (current: string) => {
+  const index = GRADES.findIndex((grade) => grade.key === current);
+  return GRADES[Math.min(index + 1, GRADES.length - 1)]?.key ?? current;
+};
+
 export default function App() {
   if (!supabaseConfigured) return <GradingApp club={null} />;
   return (
@@ -52,6 +58,8 @@ function GradingApp({ club }: { club: Club | null }) {
   const [activeExaminerId, setActiveExaminerId] = useState<string | null>(null);
   const [savedEvals, setSavedEvals] = useState<Evaluation[]>(supabaseConfigured ? [] : demoEvaluations);
   const [loadingEvals, setLoadingEvals] = useState(supabaseConfigured);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showStudentForm, setShowStudentForm] = useState(false);
   const [students, setStudents] = useState<Student[]>(supabaseConfigured ? [] : demoStudents);
   const [loadingStudents, setLoadingStudents] = useState(supabaseConfigured);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -59,7 +67,7 @@ function GradingApp({ club }: { club: Club | null }) {
   const [saved, setSaved] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [liveSession, setLiveSession] = useState<LiveSessionState>(null);
-  const [view, setView] = useState<'records' | 'planning' | 'admin'>(club ? 'admin' : 'records');
+  const [view, setView] = useState<'assessment' | 'students' | 'planning' | 'admin'>(club ? 'admin' : 'assessment');
 
   const currentGradeInfo = GRADES.find((r) => r.key === profile.currentGrade);
   const maxScore = currentGradeInfo?.maxScore ?? 1;
@@ -325,43 +333,53 @@ function GradingApp({ club }: { club: Club | null }) {
     setLiveSession(null);
   };
 
+  const insertDemoStudents = (rows: StudentInput[]) => {
+    const createdAt = new Date().toISOString();
+    setStudents((current) => [
+      ...rows.map((student, index) => ({
+        ...student,
+        club_id: 'demo-club',
+        id: `local-${Date.now()}-${index}`,
+        created_at: createdAt,
+      })),
+      ...current,
+    ]);
+  };
+
+  const duplicateEmailMessage = (message: string) =>
+    /students_email_key|duplicate key/i.test(message) ? 'A student with that email already exists.' : message;
+
   const handleImportStudents = async (parsed: ParsedStudent[]) => {
-    const rows = parsed.map((c) => ({
-      club_id: club?.id,
-      student_name: c.student_name,
-      candidate_id: c.candidate_id,
-      current_rank: c.current_rank,
-      target_rank: c.target_rank,
-      examiner_name: c.examiner_name,
-      notes: c.notes,
-    }));
-    if (!supabase) {
-      const createdAt = new Date().toISOString();
-      setStudents((current) => [
-        ...rows.map((candidate, index) => ({
-          ...candidate,
-          club_id: 'demo-club',
-          id: `local-${Date.now()}-${index}`,
-          created_at: createdAt,
-        })),
-        ...current,
-      ]);
-      return;
-    }
-    const { error } = await supabase.from('students').insert(rows);
-    if (error) {
-      throw new Error(`Could not import students: ${error.message}`);
-    }
+    if (!supabase) return insertDemoStudents(parsed);
+    const { error } = await supabase.from('students').insert(parsed.map((student) => ({ ...student, club_id: club?.id })));
+    if (error) throw new Error(`Could not import students: ${duplicateEmailMessage(error.message)}`);
     await loadStudents();
   };
 
+  const handleSaveStudent = async (input: StudentInput) => {
+    if (!supabase) {
+      if (editingStudent) {
+        setStudents((current) => current.map((item) => (item.id === editingStudent.id ? { ...item, ...input } : item)));
+      } else {
+        insertDemoStudents([input]);
+      }
+    } else {
+      const { error } = editingStudent
+        ? await supabase.from('students').update(input).eq('id', editingStudent.id).eq('club_id', club?.id ?? '')
+        : await supabase.from('students').insert({ ...input, club_id: club?.id });
+      if (error) throw new Error(duplicateEmailMessage(error.message));
+      await loadStudents();
+    }
+    setEditingStudent(null);
+    setShowStudentForm(false);
+  };
   const handleSelectStudent = (c: Student) => {
     setProfile({
       studentName: c.student_name,
-      candidateId: c.candidate_id,
+      candidateId: c.email ?? '',
       currentGrade: c.current_rank as ProfileData['currentGrade'],
-      targetGrade: c.target_rank,
-      examiners: [{ id: 'ex-1', name: c.examiner_name ?? '' }],
+      targetGrade: nextGrade(c.current_rank),
+      examiners: [{ id: 'ex-1', name: '' }],
       date: today,
     });
     setExaminerScores({});
@@ -419,9 +437,9 @@ function GradingApp({ club }: { club: Club | null }) {
             </div>
             <div>
               <h1 className="text-sm font-extrabold tracking-tight text-slate-900 sm:text-base">
-                Martial Arts Grading
+                Club Portal
               </h1>
-              <p className="hidden text-xs text-slate-500 sm:block">Multi-Examiner Assessment & Evaluation System</p>
+              <p className="hidden text-xs text-slate-500 sm:block">Dojang progress tracker and assessment</p>
               {club && (
                 <p className="text-[11px] text-slate-500">
                   {club.name} · Staff join code: <span className="font-mono font-semibold">{club.join_code}</span>
@@ -462,7 +480,7 @@ function GradingApp({ club }: { club: Club | null }) {
 
       <nav aria-label="Dashboard sections" className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl gap-1 px-4 sm:px-6">
-          {([['admin', 'Admin'], ['planning', 'Session planning'], ['records', 'Records']] as const).map(([key, label]) => (
+          {([['admin', 'Admin'], ['students', 'Students'], ['planning', 'Session planning'], ['assessment', 'Assessment']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setView(key)}
@@ -475,7 +493,7 @@ function GradingApp({ club }: { club: Club | null }) {
         </div>
       </nav>
 
-      {view !== 'records' && (
+      {(view === 'admin' || view === 'planning') && (
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           {club ? (
             view === 'admin' ? <AdminView club={club} /> : <SessionPlanning club={club} />
@@ -487,7 +505,54 @@ function GradingApp({ club }: { club: Club | null }) {
         </main>
       )}
 
-      {view === 'records' && (
+      {view === 'students' && (
+        <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+          {!supabaseConfigured && (
+            <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Demo preview: students you add stay in this page only.
+            </div>
+          )}
+          {dataError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {dataError}
+            </div>
+          )}
+          {showStudentForm ? (
+            <StudentForm
+              student={editingStudent}
+              onSave={handleSaveStudent}
+              onCancel={() => {
+                setEditingStudent(null);
+                setShowStudentForm(false);
+              }}
+            />
+          ) : (
+            <button
+              onClick={() => setShowStudentForm(true)}
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+            >
+              Add student
+            </button>
+          )}
+          <StudentImport onImport={handleImportStudents} />
+          <StudentList
+            students={students}
+            loading={loadingStudents}
+            onSelect={(student) => {
+              handleSelectStudent(student);
+              setView('assessment');
+            }}
+            onEdit={(student) => {
+              setEditingStudent(student);
+              setShowStudentForm(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onDelete={handleDeleteStudent}
+          />
+        </main>
+      )}
+
+      {view === 'assessment' && (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {!supabaseConfigured && (
           <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -576,15 +641,6 @@ function GradingApp({ club }: { club: Club | null }) {
               )}
             </div>
 
-            <StudentImport onImport={handleImportStudents} />
-
-            <StudentList
-              students={students}
-              loading={loadingStudents}
-              onSelect={handleSelectStudent}
-              onDelete={handleDeleteStudent}
-            />
-
             <SavedEvaluations
               evaluations={savedEvals}
               loading={loadingEvals}
@@ -598,7 +654,7 @@ function GradingApp({ club }: { club: Club | null }) {
 
       <footer className="border-t border-slate-200 bg-white/50 py-6">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-slate-400 sm:px-6">
-          Martial Arts Grading & Assessment System — Multi-Examiner Combined Scoring
+          Club Portal — Dojang progress tracker and assessment
         </div>
       </footer>
     </div>

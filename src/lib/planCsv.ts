@@ -1,4 +1,4 @@
-import { parseCSV } from '@/lib/csvUtils';
+import { normaliseDate, parseCSV } from '@/lib/csvUtils';
 import { PLAN_SECTIONS, type PlanSection } from '@/lib/supabase';
 
 export type PlanActivityInput = {
@@ -57,26 +57,6 @@ const normaliseSection = (value: string): PlanSection => {
   if (lower.startsWith('cool')) return 'Cool down';
   return PLAN_SECTIONS.find((item) => item.toLowerCase() === lower) ?? 'Main content';
 };
-
-// Accepts YYYY-MM-DD or DD/MM/YYYY (UK) and returns ISO, or null if invalid.
-export function normaliseDate(value: string): string | null {
-  const text = value.trim();
-  let year: number, month: number, day: number;
-  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (match) {
-    [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  } else {
-    match = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
-    if (!match) return null;
-    day = Number(match[1]);
-    month = Number(match[2]);
-    year = Number(match[3]);
-    if (year < 100) year += 2000;
-  }
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
-  return date.toISOString().split('T')[0];
-}
 
 const normaliseTime = (value: string): string | null => {
   const match = value.trim().match(/^(\d{1,2}):(\d{2})/);

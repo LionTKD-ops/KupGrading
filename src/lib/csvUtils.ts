@@ -1,74 +1,66 @@
 import { GRADES } from '@/data/rubrics';
+import { isUnder16, type StudentInput } from '@/lib/supabase';
 
-export type ParsedStudent = {
-  student_name: string;
-  candidate_id: string;
-  current_rank: string;
-  target_rank: string;
-  examiner_name: string | null;
-  notes: string | null;
+export type ParsedStudent = StudentInput;
+
+export type StudentImportResult = {
+  students: ParsedStudent[];
+  errors: string[];
 };
 
-// Map various header name variations to canonical field keys
 const headerAliases: Record<string, keyof ParsedStudent> = {
-  student_name: 'student_name',
   name: 'student_name',
   'student name': 'student_name',
+  student_name: 'student_name',
   fullname: 'student_name',
   'full name': 'student_name',
-  student_id: 'candidate_id',
-  'student id': 'candidate_id',
-  candidate_id: 'candidate_id',
-  'candidate id': 'candidate_id',
-  id: 'candidate_id',
-  registration: 'candidate_id',
+  email: 'email',
+  'email address': 'email',
+  'e-mail': 'email',
+  phone: 'phone',
+  telephone: 'phone',
+  mobile: 'phone',
+  'phone number': 'phone',
+  "guardian's name": 'guardian_name',
+  'guardians name': 'guardian_name',
+  'guardian name': 'guardian_name',
+  guardian: 'guardian_name',
+  parent: 'guardian_name',
+  dob: 'date_of_birth',
+  'date of birth': 'date_of_birth',
+  birthday: 'date_of_birth',
+  'current grade': 'current_rank',
   current_rank: 'current_rank',
   'current rank': 'current_rank',
-  'current grade': 'current_rank',
-  rank: 'current_rank',
   grade: 'current_rank',
+  rank: 'current_rank',
   belt: 'current_rank',
-  target_rank: 'target_rank',
-  'target rank': 'target_rank',
-  'target grade': 'target_rank',
-  'grading rank': 'target_rank',
-  'grading grade': 'target_rank',
-  'testing for': 'target_rank',
-  examiner_name: 'examiner_name',
-  'examiner name': 'examiner_name',
-  examiner: 'examiner_name',
-  notes: 'notes',
-  note: 'notes',
-  comments: 'notes',
+  'date of last grading': 'last_grading_date',
+  'last grading': 'last_grading_date',
+  'last grading date': 'last_grading_date',
+  'bt membership number': 'bt_membership_number',
+  'bt membership no': 'bt_membership_number',
+  'membership number': 'bt_membership_number',
+  'bt number': 'bt_membership_number',
+  'membership expiry': 'membership_expiry',
+  'membership expiry date': 'membership_expiry',
+  expiry: 'membership_expiry',
+  'belt size': 'belt_size',
 };
 
-const gradeKeys = GRADES.map((r) => r.key.toLowerCase());
+export const gradeKeys = GRADES.map((r) => r.key.toLowerCase());
 const gradeLabels = GRADES.map((r) => r.label.toLowerCase());
 
-function normalizeGrade(value: string): string {
+export function normalizeGrade(value: string): string {
   const lower = value.trim().toLowerCase();
-  // Exact key match
-  const exactKey = GRADES.find((r) => r.key.toLowerCase() === lower);
-  if (exactKey) return exactKey.key;
-  // Exact label match
-  const exactLabel = GRADES.find((r) => r.label.toLowerCase() === lower);
-  if (exactLabel) return exactLabel.key;
-  // Partial match
+  const exact = GRADES.find((r) => r.key.toLowerCase() === lower || r.label.toLowerCase() === lower);
+  if (exact) return exact.key;
   const partial = GRADES.find(
     (r) =>
-      r.key.toLowerCase().includes(lower) ||
-      r.label.toLowerCase().includes(lower) ||
-      lower.includes(r.key.toLowerCase()),
+      lower !== '' &&
+      (r.key.toLowerCase().includes(lower) || r.label.toLowerCase().includes(lower) || lower.includes(r.key.toLowerCase())),
   );
-  if (partial) return partial.key;
-  return value.trim();
-}
-
-function inferTargetGrade(currentGrade: string): string {
-  const info = GRADES.find((r) => r.key === currentGrade);
-  if (!info) return GRADES[0]?.key ?? '10-9 KUP';
-  const higher = GRADES.filter((r) => r.maxScore > info.maxScore);
-  return higher[0]?.key ?? currentGrade;
+  return partial ? partial.key : value.trim();
 }
 
 export function parseCSV(csvText: string): string[][] {
@@ -111,81 +103,103 @@ export function parseCSV(csvText: string): string[][] {
   return rows;
 }
 
-export function parseStudentsCSV(csvText: string): ParsedStudent[] {
+// Accepts YYYY-MM-DD or DD/MM/YYYY (UK) and returns ISO, or null if invalid.
+export function normaliseDate(value: string): string | null {
+  const text = value.trim();
+  let year: number, month: number, day: number;
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) {
+    [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  } else {
+    match = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+    if (!match) return null;
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+    if (year < 100) year += 2000;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date.toISOString().split('T')[0];
+}
+
+export const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+// Shared by the form and the CSV import. Returns a message when the record is invalid.
+export function validateStudent(student: ParsedStudent): string | null {
+  if (!student.student_name.trim()) return 'Name is required';
+  if (!student.email || !isValidEmail(student.email)) return 'A valid email is required';
+  if (!student.current_rank) return 'Current grade is required';
+  if (isUnder16(student.date_of_birth) && !student.guardian_name?.trim()) {
+    return "Guardian's name is required for students under 16";
+  }
+  return null;
+}
+
+export function parseStudentsCSV(csvText: string): StudentImportResult {
   const rows = parseCSV(csvText);
-  if (rows.length < 2) return [];
+  const errors: string[] = [];
+  if (rows.length < 2) return { students: [], errors: ['The file needs a header row and at least one student.'] };
 
-  const headerFields = rows[0].map((h) => h.replace(/^\uFEFF/, '').toLowerCase());
-  const colMap: Record<number, keyof ParsedStudent> = {};
-
-  headerFields.forEach((header, idx) => {
-    const canonical = headerAliases[header];
-    if (canonical) {
-      colMap[idx] = canonical;
-    }
+  const columns: Partial<Record<keyof ParsedStudent, number>> = {};
+  rows[0].forEach((header, index) => {
+    const key = headerAliases[header.replace(/^\uFEFF/, '').trim().toLowerCase()];
+    if (key && !(key in columns)) columns[key] = index;
   });
-
-  const hasNameHeader = Object.values(colMap).includes('student_name');
-  const hasIdHeader = Object.values(colMap).includes('candidate_id');
-
-  const students: ParsedStudent[] = [];
-
-  for (let i = 1; i < rows.length; i++) {
-    const fields = rows[i];
-
-    let student: ParsedStudent;
-
-    if (hasNameHeader || hasIdHeader) {
-      // Header-based mapping
-      student = {
-        student_name: '',
-        candidate_id: '',
-        current_rank: '10-9 KUP',
-        target_rank: '',
-        examiner_name: null,
-        notes: null,
-      };
-      fields.forEach((value, idx) => {
-        const key = colMap[idx];
-        if (!key) return;
-        if (key === 'current_rank') {
-          student[key] = normalizeGrade(value);
-        } else if (key === 'target_rank') {
-          student[key] = value ? normalizeGrade(value) : '';
-        } else if (key === 'examiner_name' || key === 'notes') {
-          student[key] = value || null;
-        } else {
-          student[key] = value;
-        }
-      });
-    } else {
-      // Positional fallback: Name, ID, CurrentGrade, TargetGrade, Examiner, Notes
-      student = {
-        student_name: fields[0] || '',
-        candidate_id: fields[1] || '',
-        current_rank: normalizeGrade(fields[2] || '10-9 KUP'),
-        target_rank: fields[3] ? normalizeGrade(fields[3]) : '',
-        examiner_name: fields[4] || null,
-        notes: fields[5] || null,
-      };
-    }
-
-    if (!student.student_name && !student.candidate_id) continue;
-    if (!student.student_name) student.student_name = `Student ${student.candidate_id}`;
-    if (!student.candidate_id) student.candidate_id = `STU-${Date.now()}-${i}`;
-    if (!student.current_rank) student.current_rank = '10-9 KUP';
-    if (!student.target_rank) student.target_rank = inferTargetGrade(student.current_rank);
-
-    students.push(student);
+  if (columns.student_name === undefined || columns.email === undefined) {
+    return { students: [], errors: ['The header row needs at least "Name" and "Email" columns.'] };
   }
 
-  return students;
+  const text = (row: string[], key: keyof ParsedStudent) => {
+    const index = columns[key];
+    return index === undefined ? '' : (row[index] ?? '').trim();
+  };
+  const students: ParsedStudent[] = [];
+  const seen = new Set<string>();
+
+  rows.slice(1).forEach((row, index) => {
+    const line = index + 2;
+    const dateField = (key: keyof ParsedStudent): string | null => {
+      const raw = text(row, key);
+      if (!raw) return null;
+      const iso = normaliseDate(raw);
+      if (!iso) errors.push(`Row ${line}: "${raw}" is not a valid date (use YYYY-MM-DD or DD/MM/YYYY).`);
+      return iso;
+    };
+    const student: ParsedStudent = {
+      student_name: text(row, 'student_name'),
+      email: text(row, 'email').toLowerCase(),
+      phone: text(row, 'phone') || null,
+      guardian_name: text(row, 'guardian_name') || null,
+      date_of_birth: dateField('date_of_birth'),
+      current_rank: normalizeGrade(text(row, 'current_rank') || GRADES[0].key),
+      last_grading_date: dateField('last_grading_date'),
+      bt_membership_number: text(row, 'bt_membership_number') || null,
+      membership_expiry: dateField('membership_expiry'),
+      belt_size: text(row, 'belt_size') || null,
+    };
+
+    const problem = validateStudent(student);
+    if (problem) {
+      errors.push(`Row ${line}: ${problem}.`);
+      return;
+    }
+    if (!gradeKeys.includes(student.current_rank.toLowerCase())) {
+      errors.push(`Row ${line}: grade "${student.current_rank}" is not recognised.`);
+      return;
+    }
+    if (seen.has(student.email!)) {
+      errors.push(`Row ${line}: email ${student.email} appears more than once in the file.`);
+      return;
+    }
+    seen.add(student.email!);
+    students.push(student);
+  });
+
+  return { students, errors };
 }
 
 // Convert a Google Sheets sharing URL to a CSV export URL
-// Handles formats like:
-//   https://docs.google.com/spreadsheets/d/FILE_ID/edit#gid=0
-//   https://docs.google.com/spreadsheets/d/FILE_ID/edit?usp=sharing
 export function googleSheetsURLToCSV(url: string): string | null {
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (!match) return null;
@@ -200,11 +214,11 @@ export function isGradeValid(grade: string): boolean {
 }
 
 export function generateSampleStudentsCSV(): string {
-  const headers = 'Student Name,Student ID,Current Grade,Target Grade,Examiner Name,Notes';
+  const headers =
+    "Name,Email,Phone,Guardian's Name,DOB,Current Grade,Date of Last Grading,BT Membership Number,Membership Expiry,Belt Size";
   const rows = [
-    'Jane Doe,TKD-2026-001,10-9 KUP,8-7 KUP,Master Kim,',
-    'John Smith,TKD-2026-002,8-7 KUP,6-5 KUP,Master Kim,Focus on stances',
-    'Alex Chen,TKD-2026-003,6-5 KUP,4-3 KUP,Master Lee,Promising talent',
+    'Jane Doe,jane@example.com,07700900001,,1990-04-12,10-9 KUP,2026-03-01,BT123456,2027-03-31,260',
+    'John Smith,john@example.com,07700900002,Sam Smith,2014-09-30,8-7 KUP,2026-06-14,BT123457,2027-03-31,240',
   ];
   return [headers, ...rows].join('\n');
 }

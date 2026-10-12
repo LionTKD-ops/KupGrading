@@ -12,6 +12,7 @@ export default function StudentImport({ onImport }: Props) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [preview, setPreview] = useState<ParsedStudent[]>([]);
+  const [rowIssues, setRowIssues] = useState<string[]>([]);
   const [sheetUrl, setSheetUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -21,12 +22,13 @@ export default function StudentImport({ onImport }: Props) {
     setErrorMsg('');
     try {
       const text = await file.text();
-      const students = parseStudentsCSV(text);
+      const { students, errors } = parseStudentsCSV(text);
       if (students.length === 0) {
         setStatus('error');
-        setErrorMsg('No valid students found in the file. Make sure it has a header row with at least "Student Name" and "Student ID" columns.');
+        setErrorMsg(errors.length > 0 ? errors.slice(0, 5).join(' ') : 'No valid students found in the file.');
         return;
       }
+      setRowIssues(errors);
       setPreview(students);
       setStatus('preview');
     } catch {
@@ -64,12 +66,13 @@ export default function StudentImport({ onImport }: Props) {
         return;
       }
       const text = await resp.text();
-      const students = parseStudentsCSV(text);
+      const { students, errors } = parseStudentsCSV(text);
       if (students.length === 0) {
         setStatus('error');
-        setErrorMsg('No valid students found in the sheet. Make sure the first row has headers like "Student Name" and "Student ID".');
+        setErrorMsg(errors.length > 0 ? errors.slice(0, 5).join(' ') : 'No valid students found in the sheet.');
         return;
       }
+      setRowIssues(errors);
       setPreview(students);
       setStatus('preview');
     } catch {
@@ -94,6 +97,7 @@ export default function StudentImport({ onImport }: Props) {
 
   const handleCancelPreview = () => {
     setPreview([]);
+    setRowIssues([]);
     setStatus('idle');
   };
 
@@ -111,6 +115,7 @@ export default function StudentImport({ onImport }: Props) {
     setStatus('idle');
     setErrorMsg('');
     setPreview([]);
+    setRowIssues([]);
     setSheetUrl('');
     setShowUrlInput(false);
     if (fileRef.current) fileRef.current.value = '';
@@ -149,25 +154,33 @@ export default function StudentImport({ onImport }: Props) {
                 <thead className="sticky top-0 bg-slate-50">
                   <tr className="text-left text-slate-500">
                     <th className="px-3 py-2 font-semibold">Name</th>
-                    <th className="px-3 py-2 font-semibold">Student ID</th>
+                    <th className="px-3 py-2 font-semibold">Email</th>
                     <th className="px-3 py-2 font-semibold">Grade</th>
-                    <th className="px-3 py-2 font-semibold">Target</th>
-                    <th className="px-3 py-2 font-semibold">Examiner</th>
+                    <th className="px-3 py-2 font-semibold">DOB</th>
+                    <th className="px-3 py-2 font-semibold">Guardian</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {preview.map((student, i) => (
                     <tr key={i} className="text-slate-700">
                       <td className="px-3 py-2 font-medium">{student.student_name}</td>
-                      <td className="px-3 py-2 font-mono text-slate-500">{student.candidate_id}</td>
+                      <td className="px-3 py-2 text-slate-500">{student.email}</td>
                       <td className="px-3 py-2">{student.current_rank}</td>
-                      <td className="px-3 py-2">{student.target_rank}</td>
-                      <td className="px-3 py-2">{student.examiner_name || '—'}</td>
+                      <td className="px-3 py-2">{student.date_of_birth || '—'}</td>
+                      <td className="px-3 py-2">{student.guardian_name || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {rowIssues.length > 0 && (
+              <div className="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                <p className="font-semibold">{rowIssues.length} row{rowIssues.length !== 1 ? 's' : ''} skipped:</p>
+                <ul className="mt-1 list-disc pl-4">
+                  {rowIssues.slice(0, 8).map((issue) => <li key={issue}>{issue}</li>)}
+                </ul>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmImport}
@@ -221,7 +234,7 @@ export default function StudentImport({ onImport }: Props) {
                     Drop a CSV file here or click to browse
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Columns: Student Name, Student ID, Current Grade, Target Grade, Examiner, Notes
+                    Columns: Name, Email, Phone, Guardian's Name, DOB, Current Grade, Date of Last Grading, BT Membership Number, Membership Expiry, Belt Size
                   </p>
                 </>
               )}

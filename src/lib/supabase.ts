@@ -33,12 +33,28 @@ export type Student = {
   id: string;
   club_id: string;
   student_name: string;
-  candidate_id: string;
+  email: string | null;
+  phone: string | null;
+  guardian_name: string | null;
+  date_of_birth: string | null;
   current_rank: string;
-  target_rank: string;
-  examiner_name: string | null;
-  notes: string | null;
+  last_grading_date: string | null;
+  bt_membership_number: string | null;
+  membership_expiry: string | null;
+  belt_size: string | null;
   created_at: string;
+};
+
+export type StudentInput = Omit<Student, 'id' | 'club_id' | 'created_at'>;
+
+export const BELT_SIZES = ['220', '240', '260', '280', '300', '320', '340'] as const;
+
+export const isUnder16 = (dateOfBirth: string | null, on: Date = new Date()) => {
+  if (!dateOfBirth) return false;
+  const dob = new Date(`${dateOfBirth}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return false;
+  const sixteenth = new Date(dob.getFullYear() + 16, dob.getMonth(), dob.getDate());
+  return on < sixteenth;
 };
 
 export type AssessmentSession = {
@@ -101,6 +117,11 @@ export type Coach = {
   phone: string | null;
   rank: CoachRank;
   dan_grade: string | null;
+  date_of_birth: string | null;
+  last_grading_date: string | null;
+  bt_membership_number: string | null;
+  membership_expiry: string | null;
+  belt_size: string | null;
   qualification_expiry: string | null;
   active: boolean;
   notes: string | null;
