@@ -3,6 +3,7 @@ import { LogIn, Loader2, ShieldCheck, Store } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import AdminPanel from '@/components/AdminPanel';
+import StudentPortal, { type PortalEntry } from '@/components/StudentPortal';
 
 export type Club = {
   id: string;
@@ -14,7 +15,7 @@ type Props = {
   children: (club: Club) => ReactNode;
 };
 
-type Screen = 'login' | 'signup' | 'join';
+type Screen = 'login' | 'signup' | 'join' | 'student';
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20';
@@ -32,6 +33,7 @@ export default function ClubAccess({ children }: Props) {
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [portal, setPortal] = useState<PortalEntry[] | null>(null);
   const [recovery, setRecovery] = useState(false);
   const [newPassword, setNewPassword] = useState('');
 
@@ -72,6 +74,7 @@ export default function ClubAccess({ children }: Props) {
         return;
       }
       if (!cancelled) setIsAdmin(false);
+      if (!cancelled) setPortal(null);
 
       const { data: initialMembership, error: membershipError } = await client
         .from('club_memberships')
@@ -116,7 +119,11 @@ export default function ClubAccess({ children }: Props) {
         membership = refreshedMembership;
       }
 
-      if (!membership) return;
+      if (!membership) {
+        const { data: portalData } = await client.rpc('my_student_portal');
+        if (!cancelled && Array.isArray(portalData) && portalData.length > 0) setPortal(portalData as PortalEntry[]);
+        return;
+      }
       const { data: clubData, error: clubError } = await client
         .from('clubs')
         .select('id, name, join_code')
@@ -149,6 +156,13 @@ export default function ClubAccess({ children }: Props) {
     if (screen === 'login') {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) setError(authError.message);
+    } else if (screen === 'student') {
+      const { data, error: authError } = await supabase.auth.signUp({ email, password });
+      if (authError) {
+        setError(authError.message);
+      } else if (!data.session) {
+        setMessage('Check your email to confirm your account, then sign in. Use the email address held on your student record.');
+      }
     } else {
       const pending_club_action = screen === 'signup' ? 'create' : 'join';
       const metadata = screen === 'signup'
@@ -253,6 +267,7 @@ export default function ClubAccess({ children }: Props) {
   }
   if (session && isAdmin && !busy) return <AdminPanel email={session.user.email ?? ''} onSignOut={handleSignOut} />;
   if (club) return <>{children(club)}</>;
+  if (session && portal && !busy) return <StudentPortal entries={portal} email={session.user.email ?? ''} onSignOut={handleSignOut} />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-amber-50/30 px-4 py-10">
@@ -300,19 +315,22 @@ export default function ClubAccess({ children }: Props) {
           </form>
         ) : (
           <>
-            <div className="mb-5 grid grid-cols-3 gap-2">
-              {(['login', 'signup', 'join'] as const).map((option) => (
+            <div className="mb-5 grid grid-cols-4 gap-2">
+              {(['login', 'signup', 'join', 'student'] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => { setScreen(option); setError(''); setMessage(''); }}
                   className={`rounded-lg px-2 py-2 text-xs font-semibold capitalize ${screen === option ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
                 >
-                  {option === 'signup' ? 'Create club' : option === 'join' ? 'Join club' : 'Sign in'}
+                  {option === 'signup' ? 'Create club' : option === 'join' ? 'Join club' : option === 'student' ? 'Student' : 'Sign in'}
                 </button>
               ))}
             </div>
             <form onSubmit={handleAuth} className="space-y-4">
+              {screen === 'student' && (
+                <p className="text-sm text-slate-600">Students and parents: use the email address your club holds on your student record to see your assessment countdown and feedback.</p>
+              )}
               {screen === 'signup' && (
                 <input className={inputClass} value={clubName} onChange={(event) => setClubName(event.target.value)} placeholder="Club name" required />
               )}
@@ -322,7 +340,7 @@ export default function ClubAccess({ children }: Props) {
               <input className={inputClass} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" required />
               <input className={inputClass} type="password" autoComplete={screen === 'login' ? 'current-password' : 'new-password'} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (at least 8 characters)" required />
               <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white">
-                <LogIn size={16} /> {screen === 'login' ? 'Sign in' : screen === 'signup' ? 'Create club account' : 'Create account and join'}
+                <LogIn size={16} /> {screen === 'login' ? 'Sign in' : screen === 'signup' ? 'Create club account' : screen === 'student' ? 'Create student account' : 'Create account and join'}
               </button>
               {screen === 'login' && (
                 <button type="button" onClick={handleForgotPassword} className="w-full text-sm text-slate-500 hover:text-slate-800">

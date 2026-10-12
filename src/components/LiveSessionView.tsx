@@ -171,8 +171,10 @@ export default function LiveSessionView({
   const totalSlots = totalItems * Math.max(namedExaminers.length, 1);
 
   const combinedAverage = useMemo(() => {
-    const all = allScores.map((s) => s.score);
-    return all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : 0;
+    const byExaminer = new Map<string, number[]>();
+    for (const s of allScores) byExaminer.set(s.examiner_id, [...(byExaminer.get(s.examiner_id) ?? []), s.score]);
+    const averages = Array.from(byExaminer.values()).map((v) => v.reduce((a, b) => a + b, 0) / v.length);
+    return averages.length > 0 ? averages.reduce((a, b) => a + b, 0) / averages.length : 0;
   }, [allScores]);
 
   const scoredCount = allScores.length;
@@ -197,6 +199,9 @@ export default function LiveSessionView({
       return { id: ex.id, name: ex.name, avg, count: exScores.length };
     });
   }, [examiners, allScores]);
+
+  const allExaminersComplete =
+    namedExaminers.length > 0 && examinerAverages.filter((e) => e.name !== 'Unknown Examiner').every((e) => e.count >= totalItems);
 
   // Module combined averages
   const moduleCombined = useMemo(() => {
@@ -336,9 +341,41 @@ export default function LiveSessionView({
     );
   }
 
-  const sidebar = (
+  const progressCard = (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <Users size={16} /> Examiner progress
+      </div>
+      <div className="space-y-2.5">
+        {examinerAverages.map((ex) => {
+          const done = ex.count >= totalItems;
+          return (
+            <div key={ex.id} className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 font-medium text-slate-700">
+                {ex.id === myExaminerId && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">You</span>}
+                {ex.name}
+              </span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                {done ? 'Completed' : ex.count > 0 ? `In progress ${ex.count}/${totalItems}` : 'Not started'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {!isHost && (
+        <p className="mt-3 text-xs text-slate-400">
+          Your marks are independent. Combined results are shown to the session host only.
+        </p>
+      )}
+    </div>
+  );
+
+  const sidebar = !isHost ? progressCard : (
     <div className="space-y-4">
-      {/* Verdict */}
+      <div className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${allExaminersComplete ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
+        {allExaminersComplete ? 'All examiners have completed their assessment' : 'Waiting for examiners to complete'}
+      </div>
+      {progressCard}
       {scoredCount > 0 && (
         <div className={`overflow-hidden rounded-2xl border-2 ${vCfg.border} ${vCfg.bg} shadow-sm`}>
           <div className="flex items-center gap-3 px-5 py-4">

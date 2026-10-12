@@ -19,6 +19,7 @@ export type ProfileData = {
 type Props = {
   data: ProfileData;
   student?: Student | null;
+  examinerOptions?: string[];
   onChange: (data: ProfileData) => void;
 };
 
@@ -76,7 +77,18 @@ function makeExaminerId() {
   return `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export default function StudentProfileHeader({ data, student = null, onChange }: Props) {
+export default function StudentProfileHeader({ data, student = null, examinerOptions = [], onChange }: Props) {
+  const availableExaminers = examinerOptions.filter(
+    (name) => !data.examiners.some((e) => e.name.trim().toLowerCase() === name.toLowerCase()),
+  );
+
+  const addNamedExaminers = (names: string[]) => {
+    if (names.length === 0) return;
+    const kept = data.examiners.filter((e) => e.name.trim() !== '');
+    const added = names.map((name) => ({ id: makeExaminerId(), name }));
+    onChange({ ...data, examiners: [...kept, ...added] });
+  };
+
   const currentGradeInfo = GRADES.find((r) => r.key === gradeKeyFor(data.currentGrade));
   const isTopGrade = data.currentGrade === STUDENT_GRADES[STUDENT_GRADES.length - 1].label;
 
@@ -195,12 +207,36 @@ export default function StudentProfileHeader({ data, student = null, onChange }:
           <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <Users size={14} /> Examiner Panel
           </label>
-          <button
-            onClick={addExaminer}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600"
-          >
-            <Plus size={14} /> Add Examiner
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {examinerOptions.length > 0 && (
+              <>
+                <select
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                  value=""
+                  onChange={(e) => addNamedExaminers([e.target.value])}
+                  disabled={availableExaminers.length === 0}
+                >
+                  <option value="">{availableExaminers.length ? 'Select Kup examiner…' : 'All examiners added'}</option>
+                  {availableExaminers.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => addNamedExaminers(availableExaminers)}
+                  disabled={availableExaminers.length === 0}
+                  className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
+                >
+                  <Users size={14} /> Add all
+                </button>
+              </>
+            )}
+            <button
+              onClick={addExaminer}
+              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600"
+            >
+              <Plus size={14} /> Add Examiner
+            </button>
+          </div>
         </div>
 
         {data.examiners.length === 0 ? (

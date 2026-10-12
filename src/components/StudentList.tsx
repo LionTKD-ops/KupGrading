@@ -8,6 +8,9 @@ type Props = {
   onSelect: (student: Student) => void;
   onEdit: (student: Student) => void;
   onDelete: (id: string) => void;
+  floorIds: string[];
+  onToggleFloor: (id: string) => void;
+  onSetFloor: (ids: string[]) => void;
 };
 
 const expiryNote = (expiry: string | null) => {
@@ -20,7 +23,7 @@ const expiryNote = (expiry: string | null) => {
   );
 };
 
-export default function StudentList({ students, loading, onSelect, onEdit, onDelete }: Props) {
+export default function StudentList({ students, loading, onSelect, onEdit, onDelete, floorIds, onToggleFloor, onSetFloor }: Props) {
   const [query, setQuery] = useState('');
 
   const filtered = students.filter((c) => {
@@ -34,11 +37,29 @@ export default function StudentList({ students, loading, onSelect, onEdit, onDel
     );
   });
 
+  const allShownOnFloor = filtered.length > 0 && filtered.every((s) => floorIds.includes(s.id));
+  const toggleAllShown = () => {
+    const shownIds = filtered.map((s) => s.id);
+    onSetFloor(
+      allShownOnFloor
+        ? floorIds.filter((id) => !shownIds.includes(id))
+        : [...floorIds, ...shownIds.filter((id) => !floorIds.includes(id))],
+    );
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
         <Users size={18} className="text-amber-600" />
         <h3 className="text-sm font-bold text-slate-900">Students</h3>
+        {filtered.length > 0 && (
+          <button
+            onClick={toggleAllShown}
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            {allShownOnFloor ? 'Remove all from floor list' : 'Add all to floor list'}
+          </button>
+        )}
         <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
           {students.length}
         </span>
@@ -75,6 +96,15 @@ export default function StudentList({ students, loading, onSelect, onEdit, onDel
               className="group flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-amber-50/50"
               onClick={() => onSelect(student)}
             >
+              <input
+                type="checkbox"
+                aria-label={`Add ${student.student_name} to floor list`}
+                title="Add to floor list"
+                className="h-4 w-4 shrink-0 accent-amber-500"
+                checked={floorIds.includes(student.id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => onToggleFloor(student.id)}
+              />
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-bold text-slate-600">
                 {student.student_name.charAt(0).toUpperCase()}
               </div>

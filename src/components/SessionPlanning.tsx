@@ -9,6 +9,7 @@ import {
   type PlanSection,
   type SessionPlan,
   type SessionPlanActivity,
+  type Student,
 } from '@/lib/supabase';
 import Timetable from '@/components/Timetable';
 import { autoSyncCalendar } from '@/lib/googleCalendar';
@@ -46,6 +47,7 @@ const inputClass =
 const rankLabel = Object.fromEntries(COACH_RANKS.map((item) => [item.value, item.label]));
 
 type FormState = {
+  session_type: 'class' | 'assessment';
   title: string;
   student_count: string;
   age_range: string;
@@ -69,6 +71,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  session_type: 'class',
   title: '',
   student_count: '',
   age_range: '',
@@ -92,6 +95,7 @@ const emptyForm: FormState = {
 };
 
 const fromPlan = (plan: SessionPlan): FormState => ({
+  session_type: plan.session_type === 'assessment' ? 'assessment' : 'class',
   title: plan.title,
   student_count: plan.student_count?.toString() ?? '',
   age_range: plan.age_range ?? '',
@@ -144,20 +148,32 @@ export default function SessionPlanning({ club }: Props) {
   const [activitiesByPlan, setActivitiesByPlan] = useState<Record<string, SessionPlanActivity[]>>({});
   const [importPreview, setImportPreview] = useState<{ sessions: ParsedPlanSession[]; errors: string[] } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentIdsByPlan, setStudentIdsByPlan] = useState<Record<string, string[]>>({});
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [studentQuery, setStudentQuery] = useState('');
 
   const load = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const [plansResult, coachesResult, activitiesResult] = await Promise.all([
+    const [plansResult, coachesResult, activitiesResult, studentsResult, planStudentsResult] = await Promise.all([
       supabase.from('session_plans').select('*').eq('club_id', clubId).order('session_date').order('session_time'),
       supabase.from('coaches').select('*').eq('club_id', clubId).eq('active', true).order('full_name'),
       supabase.from('session_plan_activities').select('*').eq('club_id', clubId).order('sort_order'),
+      supabase.from('students').select('*').eq('club_id', clubId).order('student_name'),
+      supabase.from('session_plan_students').select('session_plan_id, student_id').eq('club_id', clubId),
     ]);
-    const loadError = plansResult.error ?? coachesResult.error ?? activitiesResult.error;
+    const loadError = plansResult.error ?? coachesResult.error ?? activitiesResult.error ?? studentsResult.error ?? planStudentsResult.error;
     if (loadError) setError(loadError.message);
     else {
       setPlans((plansResult.data ?? []) as SessionPlan[]);
       setCoaches((coachesResult.data ?? []) as Coach[]);
+      setStudents((studentsResult.data ?? []) as Student[]);
+      const byPlan: Record<string, string[]> = {};
+      (planStudentsResult.data ?? []).forEach((row) => {
+        (byPlan[row.session_plan_id as string] ??= []).push(row.student_id as string);
+      });
+      setStudentIdsByPlan(byPlan);
       const grouped: Record<string, SessionPlanActivity[]> = {};
       ((activitiesResult.data ?? []) as SessionPlanActivity[]).forEach((item) => {
         (grouped[item.session_plan_id] ??= []).push(item);
@@ -177,6 +193,13 @@ export default function SessionPlanning({ club }: Props) {
   const toggleCoach = (id: string) =>
     set('coach_ids', form.coach_ids.includes(id) ? form.coach_ids.filter((item) => item !== id) : [...form.coach_ids, id]);
 
+  const toggleStudent = (id: string) =>
+    setSelectedStudentIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]));
+
+  const visibleStudents = students.filter((student) =>
+    student.student_name.toLowerCase().includes(studentQuery.trim().toLowerCase()),
+  );
+
   const hasLeadership = (ids: string[]) =>
     ids.some((id) => {
       const coach = coaches.find((item) => item.id === id);
@@ -187,9 +210,12 @@ export default function SessionPlanning({ club }: Props) {
     setForm(emptyForm);
     setActivities([{ ...emptyActivity, section: 'Warm up' }, { ...emptyActivity }, { ...emptyActivity, section: 'Cool down' }]);
     setEditingId(null);
+    setSelectedStudentIds([]);
+    setStudentQuery('');
   };
 
   const buildPayload = () => ({
+    session_type: form.session_type,
     title: form.title.trim(),
     student_count: form.student_count === '' ? null : Math.max(0, Number(form.student_count)),
     age_range: orNull(form.age_range),
@@ -236,6 +262,14 @@ export default function SessionPlanning({ club }: Props) {
       const { error: activityError } = await supabase.from('session_plan_activities').insert(rows);
       if (activityError) return setError(activityError.message);
     }
+    const { error: clearStudentsError } = await supabase.from('session_plan_students').delete().eq('session_plan_id', planId as string).eq('club_id', clubId);
+    if (clearStudentsError) return setError(clearStudentsError.message);
+    if (form.session_type === 'assessment' && selectedStudentIds.length > 0) {
+      const { error: studentsError } = await supabase.from('session_plan_students').insert(
+        selectedStudentIds.map((student_id) => ({ club_id: clubId, session_plan_id: planId, student_id })),
+      );
+      if (studentsError) return setError(studentsError.message);
+    }
     resetForm();
     autoSyncCalendar(clubId);
     load();
@@ -243,6 +277,7 @@ export default function SessionPlanning({ club }: Props) {
 
   const editPlan = (plan: SessionPlan) => {
     setForm(fromPlan(plan));
+    setSelectedStudentIds(studentIdsByPlan[plan.id] ?? []);
     setActivities(
       (activitiesByPlan[plan.id] ?? []).map((item) => ({
         section: item.section,
@@ -373,6 +408,11 @@ export default function SessionPlanning({ club }: Props) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold text-slate-900">{plan.title}</h3>
+            {plan.session_type === 'assessment' && (
+              <span className="mr-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                Assessment · {(studentIdsByPlan[plan.id] ?? []).length} students
+              </span>
+            )}
             {plan.series_id && (
               <span className="inline-flex items-center gap-1 text-xs text-amber-700">
                 <Link2 size={12} /> Linked series · {plans.filter((item) => item.series_id === plan.series_id).length} sessions
@@ -461,6 +501,35 @@ export default function SessionPlanning({ club }: Props) {
         <form onSubmit={savePlan} className="mt-4 space-y-5">
           <div className="overflow-hidden rounded-lg border border-slate-300">
             <Band>Session plan</Band>
+            <Row label="Session type">
+              <select className={inputClass} value={form.session_type} onChange={(e) => set('session_type', e.target.value as FormState['session_type'])} aria-label="Session type">
+                <option value="class">Class / training session</option>
+                <option value="assessment">Assessment session</option>
+              </select>
+            </Row>
+            {form.session_type === 'assessment' && (
+              <Row label="Students being assessed" hint="Students see a countdown and their previous feedback">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <input className={`${inputClass} sm:max-w-xs`} value={studentQuery} onChange={(e) => setStudentQuery(e.target.value)} placeholder="Search students" aria-label="Search students" />
+                  <button type="button" onClick={() => setSelectedStudentIds(Array.from(new Set([...selectedStudentIds, ...visibleStudents.map((s) => s.id)])))} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    Select all{studentQuery ? ' shown' : ''}
+                  </button>
+                  <button type="button" onClick={() => setSelectedStudentIds([])} className="text-xs font-semibold text-slate-500 hover:text-red-600">Clear</button>
+                  <span className="ml-auto text-xs text-slate-500">{selectedStudentIds.length} selected</span>
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
+                  {visibleStudents.length === 0 ? (
+                    <p className="p-3 text-sm text-slate-400">No students found.</p>
+                  ) : visibleStudents.map((student) => (
+                    <label key={student.id} className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-1.5 text-sm last:border-b-0 hover:bg-amber-50/50">
+                      <input type="checkbox" className="accent-amber-500" checked={selectedStudentIds.includes(student.id)} onChange={() => toggleStudent(student.id)} />
+                      <span className="font-medium text-slate-800">{student.student_name}</span>
+                      <span className="text-xs text-slate-400">{student.current_rank}</span>
+                    </label>
+                  ))}
+                </div>
+              </Row>
+            )}
             <Row label="Plan title">
               <input className={inputClass} value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. Session plan 1" required />
             </Row>

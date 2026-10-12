@@ -118,6 +118,7 @@ export type Coach = {
   phone: string | null;
   rank: CoachRank;
   dan_grade: string | null;
+  kup_examiner: boolean;
   date_of_birth: string | null;
   last_grading_date: string | null;
   bt_membership_number: string | null;
@@ -134,6 +135,7 @@ export const GROUP_ABILITIES = ['Beginners', 'Intermediate', 'Advanced', 'Mixed 
 export type SessionPlan = {
   id: string;
   club_id: string;
+  session_type: 'class' | 'assessment';
   title: string;
   student_count: number | null;
   age_range: string | null;

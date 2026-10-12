@@ -9,6 +9,7 @@ import SavedEvaluations from '@/components/SavedEvaluations';
 import StudentImport from '@/components/StudentImport';
 import StudentForm from '@/components/StudentForm';
 import StudentList from '@/components/StudentList';
+import FloorList from '@/components/FloorList';
 import LiveSessionModal from '@/components/LiveSessionModal';
 import LiveSessionView from '@/components/LiveSessionView';
 import AdminView from '@/components/AdminView';
@@ -152,6 +153,25 @@ function GradingApp({ club }: { club: Club | null }) {
     },
     [profile.currentGrade],
   );
+
+  const [examinerOptions, setExaminerOptions] = useState<string[]>([]);
+  const [floorIds, setFloorIds] = useState<string[]>([]);
+  const floorStudents = floorIds
+    .map((id) => students.find((s) => s.id === id))
+    .filter((s): s is Student => !!s);
+  const toggleFloor = (id: string) =>
+    setFloorIds((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
+
+  useEffect(() => {
+    if (!supabase || !club?.id) return;
+    supabase
+      .from('coaches')
+      .select('full_name')
+      .eq('club_id', club.id)
+      .eq('kup_examiner', true)
+      .order('full_name')
+      .then(({ data }) => setExaminerOptions((data ?? []).map((c) => c.full_name as string)));
+  }, [club?.id, view]);
 
   const loadStudents = useCallback(async () => {
     if (!supabase) {
@@ -533,9 +553,22 @@ function GradingApp({ club }: { club: Club | null }) {
             </button>
           )}
           <StudentImport onImport={handleImportStudents} />
+          <FloorList
+            students={floorStudents}
+            activeId={selectedStudent?.id ?? null}
+            onOpen={(student) => {
+              handleSelectStudent(student);
+              setView('assessment');
+            }}
+            onRemove={toggleFloor}
+            onClear={() => setFloorIds([])}
+          />
           <StudentList
             students={students}
             loading={loadingStudents}
+            floorIds={floorIds}
+            onToggleFloor={toggleFloor}
+            onSetFloor={setFloorIds}
             onSelect={(student) => {
               handleSelectStudent(student);
               setView('assessment');
@@ -587,7 +620,17 @@ function GradingApp({ club }: { club: Club | null }) {
           </div>
         </div>
 
-        <StudentProfileHeader data={profile} student={selectedStudent} onChange={handleProfileChange} />
+        <div className="mb-6 empty:hidden">
+          <FloorList
+            students={floorStudents}
+            activeId={selectedStudent?.id ?? null}
+            onOpen={handleSelectStudent}
+            onRemove={toggleFloor}
+            onClear={() => setFloorIds([])}
+          />
+        </div>
+
+        <StudentProfileHeader data={profile} student={selectedStudent} examinerOptions={examinerOptions} onChange={handleProfileChange} />
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

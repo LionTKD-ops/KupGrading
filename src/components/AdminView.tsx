@@ -21,6 +21,8 @@ const rankStyle: Record<CoachRank, string> = {
 
 type StudentSource = Pick<Coach, 'full_name' | 'email' | 'phone' | 'dan_grade' | 'date_of_birth' | 'last_grading_date' | 'bt_membership_number' | 'membership_expiry' | 'belt_size'>;
 
+const isExaminerEligible = (dan: string | null) => parseInt(dan ?? '', 10) >= 4;
+
 const danToStudentGrade = (dan: string | null) => dan ?? '1st Dan';
 
 export default function AdminView({ club }: Props) {
@@ -38,6 +40,7 @@ export default function AdminView({ club }: Props) {
   const [btNumber, setBtNumber] = useState('');
   const [membershipExpiry, setMembershipExpiry] = useState('');
   const [beltSize, setBeltSize] = useState('');
+  const [kupExaminer, setKupExaminer] = useState(false);
   const [notice, setNotice] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [qualifications, setQualifications] = useState<CoachQualification[]>([]);
@@ -105,6 +108,7 @@ export default function AdminView({ club }: Props) {
     setBtNumber('');
     setMembershipExpiry('');
     setBeltSize('');
+    setKupExaminer(false);
   };
 
   const startEdit = (coach: Coach) => {
@@ -120,6 +124,7 @@ export default function AdminView({ club }: Props) {
     setBtNumber(coach.bt_membership_number ?? '');
     setMembershipExpiry(coach.membership_expiry ?? '');
     setBeltSize(coach.belt_size ?? '');
+    setKupExaminer(coach.kup_examiner);
     setError('');
   };
 
@@ -139,6 +144,7 @@ export default function AdminView({ club }: Props) {
       bt_membership_number: btNumber.trim() || null,
       membership_expiry: membershipExpiry || null,
       belt_size: beltSize.trim() || null,
+      kup_examiner: isExaminerEligible(danGrade) && kupExaminer,
     };
     const { error: insertError } = editingId
       ? await supabase.from('coaches').update(values).eq('id', editingId).eq('club_id', club.id)
@@ -156,7 +162,7 @@ export default function AdminView({ club }: Props) {
   const updateCoach = async (
     coach: Coach,
     changes: Partial<
-      Pick<Coach, 'rank' | 'active' | 'dan_grade' | 'date_of_birth' | 'last_grading_date' | 'bt_membership_number' | 'membership_expiry' | 'belt_size'>
+      Pick<Coach, 'rank' | 'active' | 'dan_grade' | 'date_of_birth' | 'last_grading_date' | 'bt_membership_number' | 'membership_expiry' | 'belt_size' | 'kup_examiner'>
     >,
   ) => {
     if (!supabase) return;
@@ -238,6 +244,15 @@ export default function AdminView({ club }: Props) {
             <input className={inputClass} list="coach-belt-sizes" value={beltSize} onChange={(e) => setBeltSize(e.target.value)} />
             <datalist id="coach-belt-sizes">{BELT_SIZES.map((size) => <option key={size} value={size} />)}</datalist>
           </label>
+          <label className={`flex items-center gap-2 text-xs sm:col-span-4 ${isExaminerEligible(danGrade) ? 'text-slate-700' : 'text-slate-400'}`}>
+            <input
+              type="checkbox"
+              checked={isExaminerEligible(danGrade) && kupExaminer}
+              disabled={!isExaminerEligible(danGrade)}
+              onChange={(e) => setKupExaminer(e.target.checked)}
+            />
+            Kup grade examiner (4th Dan and above only)
+          </label>
           <button className="flex items-center justify-center gap-1.5 self-end rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600 sm:col-span-1">
             <UserPlus size={14} /> {editingId ? 'Save' : 'Add'}
           </button>
@@ -302,7 +317,7 @@ export default function AdminView({ club }: Props) {
                     <td className="py-2 pr-3">
                       <select
                         value={coach.dan_grade ?? ''}
-                        onChange={(e) => updateCoach(coach, { dan_grade: e.target.value })}
+                        onChange={(e) => updateCoach(coach, { dan_grade: e.target.value, ...(isExaminerEligible(e.target.value) ? {} : { kup_examiner: false }) })}
                         className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
                         aria-label={`Dan grade for ${coach.full_name}`}
                       >
@@ -312,6 +327,12 @@ export default function AdminView({ club }: Props) {
                         )}
                         {DAN_GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
                       </select>
+                      {isExaminerEligible(coach.dan_grade) && (
+                        <label className="mt-1 flex items-center gap-1 text-xs text-slate-600">
+                          <input type="checkbox" checked={coach.kup_examiner} onChange={(e) => updateCoach(coach, { kup_examiner: e.target.checked })} />
+                          Kup examiner
+                        </label>
+                      )}
                     </td>
                     <td className="py-2 pr-3">
                       <QualificationsCell
