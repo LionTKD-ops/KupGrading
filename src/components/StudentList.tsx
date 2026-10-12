@@ -28,6 +28,7 @@ export default function StudentList({ students, loading, onSelect, onEdit, onDel
     return (
       c.student_name.toLowerCase().includes(q) ||
       (c.email ?? '').toLowerCase().includes(q) ||
+      (c.guardian_email ?? '').toLowerCase().includes(q) ||
       (c.bt_membership_number ?? '').toLowerCase().includes(q) ||
       c.current_rank.toLowerCase().includes(q)
     );
@@ -82,7 +83,7 @@ export default function StudentList({ students, loading, onSelect, onEdit, onDel
                   {student.student_name}
                 </p>
                 <p className="truncate text-xs text-slate-500">
-                  {[student.email, student.current_rank, student.bt_membership_number && `BT `].filter(Boolean).join(' · ')}
+                  {[student.email ?? (student.guardian_email && `Guardian: ${student.guardian_email}`), student.current_rank, student.bt_membership_number && `BT `].filter(Boolean).join(' · ')}
                 </p>
                 {expiryNote(student.membership_expiry)}
               </div>

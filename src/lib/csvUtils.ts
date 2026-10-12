@@ -26,6 +26,10 @@ const headerAliases: Record<string, keyof ParsedStudent> = {
   'guardian name': 'guardian_name',
   guardian: 'guardian_name',
   parent: 'guardian_name',
+  "guardian's email": 'guardian_email',
+  'guardians email': 'guardian_email',
+  'guardian email': 'guardian_email',
+  'parent email': 'guardian_email',
   dob: 'date_of_birth',
   'date of birth': 'date_of_birth',
   birthday: 'date_of_birth',
@@ -117,7 +121,9 @@ export const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test
 // Shared by the form and the CSV import. Returns a message when the record is invalid.
 export function validateStudent(student: ParsedStudent): string | null {
   if (!student.student_name.trim()) return 'Name is required';
-  if (!student.email || !isValidEmail(student.email)) return 'A valid email is required';
+  if (!student.email && !student.guardian_email) return 'An email or a guardian email is required';
+  if (student.email && !isValidEmail(student.email)) return 'The email address is not valid';
+  if (student.guardian_email && !isValidEmail(student.guardian_email)) return "The guardian's email address is not valid";
   if (!student.current_rank) return 'Current grade is required';
   if (isUnder16(student.date_of_birth) && !student.guardian_name?.trim()) {
     return "Guardian's name is required for students under 16";
@@ -135,8 +141,8 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
     const key = headerAliases[header.replace(/^\uFEFF/, '').trim().toLowerCase()];
     if (key && !(key in columns)) columns[key] = index;
   });
-  if (columns.student_name === undefined || columns.email === undefined) {
-    return { students: [], errors: ['The header row needs at least "Name" and "Email" columns.'] };
+  if (columns.student_name === undefined || (columns.email === undefined && columns.guardian_email === undefined)) {
+    return { students: [], errors: ['The header row needs a "Name" column and an "Email" or "Guardian Email" column.'] };
   }
 
   const text = (row: string[], key: keyof ParsedStudent) => {
@@ -144,7 +150,6 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
     return index === undefined ? '' : (row[index] ?? '').trim();
   };
   const students: ParsedStudent[] = [];
-  const seen = new Set<string>();
 
   rows.slice(1).forEach((row, index) => {
     const line = index + 2;
@@ -157,9 +162,10 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
     };
     const student: ParsedStudent = {
       student_name: text(row, 'student_name'),
-      email: text(row, 'email').toLowerCase(),
+      email: text(row, 'email').toLowerCase() || null,
       phone: text(row, 'phone') || null,
       guardian_name: text(row, 'guardian_name') || null,
+      guardian_email: text(row, 'guardian_email').toLowerCase() || null,
       date_of_birth: dateField('date_of_birth'),
       current_rank: normalizeGrade(text(row, 'current_rank') || STUDENT_GRADES[0].label),
       last_grading_date: dateField('last_grading_date'),
@@ -177,11 +183,6 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
       errors.push(`Row ${line}: grade "${student.current_rank}" is not recognised.`);
       return;
     }
-    if (seen.has(student.email!)) {
-      errors.push(`Row ${line}: email ${student.email} appears more than once in the file.`);
-      return;
-    }
-    seen.add(student.email!);
     students.push(student);
   });
 
@@ -204,10 +205,10 @@ export function isGradeValid(grade: string): boolean {
 
 export function generateSampleStudentsCSV(): string {
   const headers =
-    "Name,Email,Phone,Guardian's Name,DOB,Current Grade,Date of Last Grading,BT Membership Number,Membership Expiry,Belt Size";
+    "Name,Email,Phone,Guardian's Name,Guardian's Email,DOB,Current Grade,Date of Last Grading,BT Membership Number,Membership Expiry,Belt Size";
   const rows = [
-    'Jane Doe,jane@example.com,07700900001,,1990-04-12,10th Kup (White Belt),2026-03-01,BT123456,2027-03-31,260',
-    'John Smith,john@example.com,07700900002,Sam Smith,2014-09-30,8th Kup (Yellow Belt),2026-06-14,BT123457,2027-03-31,240',
+    'Jane Doe,jane@example.com,07700900001,,,1990-04-12,10th Kup (White Belt),2026-03-01,BT123456,2027-03-31,260',
+    'John Smith,,07700900002,Sam Smith,sam@example.com,2014-09-30,8th Kup (Yellow Belt),2026-06-14,BT123457,2027-03-31,240',
   ];
   return [headers, ...rows].join('\n');
 }

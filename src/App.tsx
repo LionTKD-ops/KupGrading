@@ -346,13 +346,10 @@ function GradingApp({ club }: { club: Club | null }) {
     ]);
   };
 
-  const duplicateEmailMessage = (message: string) =>
-    /students_email_key|duplicate key/i.test(message) ? 'A student with that email already exists.' : message;
-
   const handleImportStudents = async (parsed: ParsedStudent[]) => {
     if (!supabase) return insertDemoStudents(parsed);
     const { error } = await supabase.from('students').insert(parsed.map((student) => ({ ...student, club_id: club?.id })));
-    if (error) throw new Error(`Could not import students: ${duplicateEmailMessage(error.message)}`);
+    if (error) throw new Error(`Could not import students: ${error.message}`);
     await loadStudents();
   };
 
@@ -367,7 +364,7 @@ function GradingApp({ club }: { club: Club | null }) {
       const { error } = editingStudent
         ? await supabase.from('students').update(input).eq('id', editingStudent.id).eq('club_id', club?.id ?? '')
         : await supabase.from('students').insert({ ...input, club_id: club?.id });
-      if (error) throw new Error(duplicateEmailMessage(error.message));
+      if (error) throw new Error(error.message);
       await loadStudents();
     }
     setEditingStudent(null);
@@ -376,7 +373,7 @@ function GradingApp({ club }: { club: Club | null }) {
   const handleSelectStudent = (c: Student) => {
     setProfile({
       studentName: c.student_name,
-      candidateId: c.email ?? '',
+      candidateId: c.email ?? c.guardian_email ?? '',
       currentGrade: gradeKeyFor(c.current_rank),
       targetGrade: nextGrade(c.current_rank),
       examiners: [{ id: 'ex-1', name: '' }],

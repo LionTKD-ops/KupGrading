@@ -75,7 +75,7 @@ export default function AdminView({ club }: Props) {
       membership_expiry: coach.membership_expiry,
       belt_size: coach.belt_size,
     };
-    const { data, error: findError } = await supabase.from('students').select('id').eq('club_id', club.id).ilike('email', email).maybeSingle();
+    const { data, error: findError } = await supabase.from('students').select('id').eq('club_id', club.id).ilike('email', email).ilike('student_name', coach.full_name).maybeSingle();
     if (findError) return findError.message;
     const { error: writeError } = data
       ? await supabase.from('students').update(fields).eq('id', data.id).eq('club_id', club.id)

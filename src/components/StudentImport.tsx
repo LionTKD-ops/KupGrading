@@ -164,7 +164,7 @@ export default function StudentImport({ onImport }: Props) {
                   {preview.map((student, i) => (
                     <tr key={i} className="text-slate-700">
                       <td className="px-3 py-2 font-medium">{student.student_name}</td>
-                      <td className="px-3 py-2 text-slate-500">{student.email}</td>
+                      <td className="px-3 py-2 text-slate-500">{student.email || student.guardian_email || '—'}</td>
                       <td className="px-3 py-2">{student.current_rank}</td>
                       <td className="px-3 py-2">{student.date_of_birth || '—'}</td>
                       <td className="px-3 py-2">{student.guardian_name || '—'}</td>
@@ -234,7 +234,7 @@ export default function StudentImport({ onImport }: Props) {
                     Drop a CSV file here or click to browse
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Columns: Name, Email, Phone, Guardian's Name, DOB, Current Grade, Date of Last Grading, BT Membership Number, Membership Expiry, Belt Size
+                    Columns: Name, Email, Phone, Guardian's Name, Guardian's Email, DOB, Current Grade, Date of Last Grading, BT Membership Number, Membership Expiry, Belt Size
                   </p>
                 </>
               )}

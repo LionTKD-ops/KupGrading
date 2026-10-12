@@ -36,6 +36,7 @@ export type Student = {
   email: string | null;
   phone: string | null;
   guardian_name: string | null;
+  guardian_email: string | null;
   date_of_birth: string | null;
   current_rank: string;
   last_grading_date: string | null;

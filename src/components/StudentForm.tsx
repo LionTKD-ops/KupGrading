@@ -18,6 +18,7 @@ type FormState = {
   email: string;
   phone: string;
   guardian_name: string;
+  guardian_email: string;
   date_of_birth: string;
   current_rank: string;
   last_grading_date: string;
@@ -31,6 +32,7 @@ const fromStudent = (student: Student | null): FormState => ({
   email: student?.email ?? '',
   phone: student?.phone ?? '',
   guardian_name: student?.guardian_name ?? '',
+  guardian_email: student?.guardian_email ?? '',
   date_of_birth: student?.date_of_birth ?? '',
   current_rank: resolveStudentGrade(student?.current_rank ?? '') ?? STUDENT_GRADES[0].label,
   last_grading_date: student?.last_grading_date ?? '',
@@ -62,9 +64,10 @@ export default function StudentForm({ student, onSave, onCancel }: Props) {
     event.preventDefault();
     const input: StudentInput = {
       student_name: form.student_name.trim(),
-      email: form.email.trim().toLowerCase(),
+      email: orNull(form.email)?.toLowerCase() ?? null,
       phone: orNull(form.phone),
       guardian_name: orNull(form.guardian_name),
+      guardian_email: orNull(form.guardian_email)?.toLowerCase() ?? null,
       date_of_birth: orNull(form.date_of_birth),
       current_rank: form.current_rank,
       last_grading_date: orNull(form.last_grading_date),
@@ -95,8 +98,8 @@ export default function StudentForm({ student, onSave, onCancel }: Props) {
         <Field label="Name">
           <input className={inputClass} value={form.student_name} onChange={(e) => set('student_name', e.target.value)} required />
         </Field>
-        <Field label="Email (used to sign in, must be unique)">
-          <input className={inputClass} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required />
+        <Field label="Email (can be shared with family; or use the guardian's email)">
+          <input className={inputClass} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required={!form.guardian_email.trim()} />
         </Field>
         <Field label="Phone">
           <input className={inputClass} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
@@ -106,6 +109,9 @@ export default function StudentForm({ student, onSave, onCancel }: Props) {
         </Field>
         <Field label={needsGuardian ? "Guardian's name (required, under 16)" : "Guardian's name (if under 16)"}>
           <input className={inputClass} value={form.guardian_name} onChange={(e) => set('guardian_name', e.target.value)} required={needsGuardian} />
+        </Field>
+        <Field label="Guardian's email (linked contact; used if the student has no email)">
+          <input className={inputClass} type="email" value={form.guardian_email} onChange={(e) => set('guardian_email', e.target.value)} required={!form.email.trim()} />
         </Field>
         <Field label="Current grade">
           <select className={inputClass} value={form.current_rank} onChange={(e) => set('current_rank', e.target.value)} required>
