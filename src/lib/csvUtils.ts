@@ -1,4 +1,4 @@
-import { GRADES } from '@/data/rubrics';
+import { resolveStudentGrade, STUDENT_GRADES } from '@/data/rubrics';
 import { isUnder16, type StudentInput } from '@/lib/supabase';
 
 export type ParsedStudent = StudentInput;
@@ -48,19 +48,8 @@ const headerAliases: Record<string, keyof ParsedStudent> = {
   'belt size': 'belt_size',
 };
 
-export const gradeKeys = GRADES.map((r) => r.key.toLowerCase());
-const gradeLabels = GRADES.map((r) => r.label.toLowerCase());
-
 export function normalizeGrade(value: string): string {
-  const lower = value.trim().toLowerCase();
-  const exact = GRADES.find((r) => r.key.toLowerCase() === lower || r.label.toLowerCase() === lower);
-  if (exact) return exact.key;
-  const partial = GRADES.find(
-    (r) =>
-      lower !== '' &&
-      (r.key.toLowerCase().includes(lower) || r.label.toLowerCase().includes(lower) || lower.includes(r.key.toLowerCase())),
-  );
-  return partial ? partial.key : value.trim();
+  return resolveStudentGrade(value) ?? value.trim();
 }
 
 export function parseCSV(csvText: string): string[][] {
@@ -172,7 +161,7 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
       phone: text(row, 'phone') || null,
       guardian_name: text(row, 'guardian_name') || null,
       date_of_birth: dateField('date_of_birth'),
-      current_rank: normalizeGrade(text(row, 'current_rank') || GRADES[0].key),
+      current_rank: normalizeGrade(text(row, 'current_rank') || STUDENT_GRADES[0].label),
       last_grading_date: dateField('last_grading_date'),
       bt_membership_number: text(row, 'bt_membership_number') || null,
       membership_expiry: dateField('membership_expiry'),
@@ -184,7 +173,7 @@ export function parseStudentsCSV(csvText: string): StudentImportResult {
       errors.push(`Row ${line}: ${problem}.`);
       return;
     }
-    if (!gradeKeys.includes(student.current_rank.toLowerCase())) {
+    if (!resolveStudentGrade(student.current_rank)) {
       errors.push(`Row ${line}: grade "${student.current_rank}" is not recognised.`);
       return;
     }
@@ -210,15 +199,15 @@ export function googleSheetsURLToCSV(url: string): string | null {
 }
 
 export function isGradeValid(grade: string): boolean {
-  return gradeKeys.includes(grade.toLowerCase()) || gradeLabels.includes(grade.toLowerCase());
+  return resolveStudentGrade(grade) !== null;
 }
 
 export function generateSampleStudentsCSV(): string {
   const headers =
     "Name,Email,Phone,Guardian's Name,DOB,Current Grade,Date of Last Grading,BT Membership Number,Membership Expiry,Belt Size";
   const rows = [
-    'Jane Doe,jane@example.com,07700900001,,1990-04-12,10-9 KUP,2026-03-01,BT123456,2027-03-31,260',
-    'John Smith,john@example.com,07700900002,Sam Smith,2014-09-30,8-7 KUP,2026-06-14,BT123457,2027-03-31,240',
+    'Jane Doe,jane@example.com,07700900001,,1990-04-12,10th Kup (White Belt),2026-03-01,BT123456,2027-03-31,260',
+    'John Smith,john@example.com,07700900002,Sam Smith,2014-09-30,8th Kup (Yellow Belt),2026-06-14,BT123457,2027-03-31,240',
   ];
   return [headers, ...rows].join('\n');
 }

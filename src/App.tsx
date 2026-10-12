@@ -14,7 +14,7 @@ import LiveSessionView from '@/components/LiveSessionView';
 import AdminView from '@/components/AdminView';
 import SessionPlanning from '@/components/SessionPlanning';
 import { supabase, supabaseConfigured, type Evaluation, type Student, type StudentInput, type ExaminerScores } from '@/lib/supabase';
-import { buildModules, GRADES, getFeedbackTier, getVerdict } from '@/data/rubrics';
+import { buildModules, GRADES, getFeedbackTier, getVerdict, gradeKeyFor } from '@/data/rubrics';
 import { demoStudents, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
 import type { ParsedStudent } from '@/lib/csvUtils';
@@ -39,7 +39,7 @@ const emptyProfile: ProfileData = {
 };
 
 const nextGrade = (current: string) => {
-  const index = GRADES.findIndex((grade) => grade.key === current);
+  const index = GRADES.findIndex((grade) => grade.key === gradeKeyFor(current));
   return GRADES[Math.min(index + 1, GRADES.length - 1)]?.key ?? current;
 };
 
@@ -377,7 +377,7 @@ function GradingApp({ club }: { club: Club | null }) {
     setProfile({
       studentName: c.student_name,
       candidateId: c.email ?? '',
-      currentGrade: c.current_rank as ProfileData['currentGrade'],
+      currentGrade: gradeKeyFor(c.current_rank),
       targetGrade: nextGrade(c.current_rank),
       examiners: [{ id: 'ex-1', name: '' }],
       date: today,

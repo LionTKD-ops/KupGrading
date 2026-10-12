@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { UserPlus } from 'lucide-react';
-import { GRADES } from '@/data/rubrics';
+import { resolveStudentGrade, STUDENT_GRADES } from '@/data/rubrics';
 import { validateStudent } from '@/lib/csvUtils';
 import { BELT_SIZES, isUnder16, type Student, type StudentInput } from '@/lib/supabase';
 
@@ -32,7 +32,7 @@ const fromStudent = (student: Student | null): FormState => ({
   phone: student?.phone ?? '',
   guardian_name: student?.guardian_name ?? '',
   date_of_birth: student?.date_of_birth ?? '',
-  current_rank: student?.current_rank ?? GRADES[0].key,
+  current_rank: resolveStudentGrade(student?.current_rank ?? '') ?? STUDENT_GRADES[0].label,
   last_grading_date: student?.last_grading_date ?? '',
   bt_membership_number: student?.bt_membership_number ?? '',
   membership_expiry: student?.membership_expiry ?? '',
@@ -109,7 +109,7 @@ export default function StudentForm({ student, onSave, onCancel }: Props) {
         </Field>
         <Field label="Current grade">
           <select className={inputClass} value={form.current_rank} onChange={(e) => set('current_rank', e.target.value)} required>
-            {GRADES.map((grade) => <option key={grade.key} value={grade.key}>{grade.label}</option>)}
+            {STUDENT_GRADES.map((grade) => <option key={grade.label} value={grade.label}>{grade.label}</option>)}
           </select>
         </Field>
         <Field label="Date of last grading">

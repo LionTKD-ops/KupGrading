@@ -30,6 +30,51 @@ export type RankKey = GradeKey;
 export type RankInfo = GradeInfo;
 export const RANKS = GRADES;
 
+// Full grade ladder used on student records; `key` is the assessment band each grade is marked against.
+export const STUDENT_GRADES: { label: string; key: GradeKey }[] = [
+  { label: '10th Kup (White Belt)', key: '10-9 KUP' },
+  { label: '9th Kup (White Belt Yellow Stripe)', key: '10-9 KUP' },
+  { label: '8th Kup (Yellow Belt)', key: '8-7 KUP' },
+  { label: '7th Kup (Yellow Belt Green Stripe)', key: '8-7 KUP' },
+  { label: '6th Kup (Green Belt)', key: '6-5 KUP' },
+  { label: '5th Kup (Green Belt Blue Stripe)', key: '6-5 KUP' },
+  { label: '4th Kup (Blue Belt)', key: '4-3 KUP' },
+  { label: '3rd Kup (Blue Belt Red Stripe)', key: '4-3 KUP' },
+  { label: '2nd Kup (Red Belt)', key: '2-1 KUP' },
+  { label: '1st Kup (Red Belt Black Stripe)', key: '2-1 KUP' },
+  { label: '1st Dan', key: '1-2 DAN' },
+  { label: '2nd Dan', key: '1-2 DAN' },
+  { label: '3rd Dan', key: '3-4 DAN' },
+  { label: '4th Dan', key: '3-4 DAN' },
+  { label: '5th Dan (Master)', key: '3-4 DAN' },
+  { label: '6th Dan (Master)', key: '3-4 DAN' },
+  { label: '7th Dan (Master)', key: '3-4 DAN' },
+  { label: '8th Dan (Grandmaster)', key: '3-4 DAN' },
+  { label: '9th Dan (Grandmaster)', key: '3-4 DAN' },
+];
+
+// Accepts a full label, "8th Kup", "8 kup", "Yellow Belt", "5th Dan" or a legacy band such as "8-7 KUP".
+export function resolveStudentGrade(value: string): string | null {
+  const text = value.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!text) return null;
+  const aliasesFor = (label: string) => {
+    const lower = label.toLowerCase();
+    const base = lower.split(' (')[0];
+    const aliases = [lower, base, base.replace(/^(\d+)(st|nd|rd|th) /, '$1 ')];
+    const belt = lower.match(/\((.*)\)/)?.[1];
+    if (belt && lower.includes('kup')) aliases.push(belt);
+    return aliases;
+  };
+  const found = STUDENT_GRADES.find((grade) => aliasesFor(grade.label).includes(text));
+  if (found) return found.label;
+  return STUDENT_GRADES.find((grade) => grade.key.toLowerCase() === text)?.label ?? null;
+}
+
+export function gradeKeyFor(value: string): GradeKey {
+  const label = resolveStudentGrade(value);
+  return STUDENT_GRADES.find((grade) => grade.label === label)?.key ?? GRADES[0].key;
+}
+
 export type RubricCriterion = {
   score: number;
   description: string;

@@ -21,7 +21,7 @@ const rankStyle: Record<CoachRank, string> = {
 
 type StudentSource = Pick<Coach, 'full_name' | 'email' | 'phone' | 'dan_grade' | 'date_of_birth' | 'last_grading_date' | 'bt_membership_number' | 'membership_expiry' | 'belt_size'>;
 
-const danToStudentGrade = (dan: string | null) => (parseInt(dan ?? '', 10) >= 3 ? '3-4 DAN' : '1-2 DAN');
+const danToStudentGrade = (dan: string | null) => dan ?? '1st Dan';
 
 export default function AdminView({ club }: Props) {
   const [coaches, setCoaches] = useState<Coach[]>([]);
