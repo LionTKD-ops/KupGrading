@@ -10,6 +10,8 @@ import StudentImport from '@/components/StudentImport';
 import StudentList from '@/components/StudentList';
 import LiveSessionModal from '@/components/LiveSessionModal';
 import LiveSessionView from '@/components/LiveSessionView';
+import AdminView from '@/components/AdminView';
+import SessionPlanning from '@/components/SessionPlanning';
 import { supabase, supabaseConfigured, type Evaluation, type Student, type ExaminerScores } from '@/lib/supabase';
 import { buildModules, GRADES, getFeedbackTier, getVerdict } from '@/data/rubrics';
 import { demoStudents, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
@@ -57,6 +59,7 @@ function GradingApp({ club }: { club: Club | null }) {
   const [saved, setSaved] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [liveSession, setLiveSession] = useState<LiveSessionState>(null);
+  const [view, setView] = useState<'records' | 'planning' | 'admin'>(club ? 'admin' : 'records');
 
   const currentGradeInfo = GRADES.find((r) => r.key === profile.currentGrade);
   const maxScore = currentGradeInfo?.maxScore ?? 1;
@@ -457,6 +460,34 @@ function GradingApp({ club }: { club: Club | null }) {
         </div>
       </header>
 
+      <nav aria-label="Dashboard sections" className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl gap-1 px-4 sm:px-6">
+          {([['admin', 'Admin'], ['planning', 'Session planning'], ['records', 'Records']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              aria-current={view === key ? 'page' : undefined}
+              className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition ${view === key ? 'border-amber-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {view !== 'records' && (
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+          {club ? (
+            view === 'admin' ? <AdminView club={club} /> : <SessionPlanning club={club} />
+          ) : (
+            <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Coaches and session planning need a connected Supabase database and a signed-in club.
+            </div>
+          )}
+        </main>
+      )}
+
+      {view === 'records' && (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {!supabaseConfigured && (
           <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -563,6 +594,7 @@ function GradingApp({ club }: { club: Club | null }) {
           </div>
         </div>
       </main>
+      )}
 
       <footer className="border-t border-slate-200 bg-white/50 py-6">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-slate-400 sm:px-6">

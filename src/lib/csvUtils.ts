@@ -71,7 +71,7 @@ function inferTargetGrade(currentGrade: string): string {
   return higher[0]?.key ?? currentGrade;
 }
 
-function parseCSV(csvText: string): string[][] {
+export function parseCSV(csvText: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';

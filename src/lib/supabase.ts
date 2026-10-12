@@ -56,6 +56,101 @@ export type AssessmentSession = {
   created_at: string;
 };
 
+export type CoachRank = 'lead' | 'qualified' | 'assistant' | 'trainee';
+
+export const COACH_RANKS: { value: CoachRank; label: string; description: string }[] = [
+  { value: 'lead', label: 'Lead coach', description: 'Can run a session and sign off gradings' },
+  { value: 'qualified', label: 'Qualified coach', description: 'Qualified to run a session' },
+  { value: 'assistant', label: 'Assistant coach', description: 'Supports a qualified or lead coach' },
+  { value: 'trainee', label: 'Trainee coach', description: 'In training, supervised at all times' },
+];
+
+export const DAN_GRADES = [
+  '1st Dan',
+  '2nd Dan',
+  '3rd Dan',
+  '4th Dan',
+  '5th Dan (Master)',
+  '6th Dan (Master)',
+  '7th Dan (Master)',
+  '8th Dan (Grandmaster)',
+  '9th Dan (Grandmaster)',
+] as const;
+
+export type CoachQualificationType = 'bt_level1_aca' | 'bt_level2_instructor';
+
+export const COACH_QUALIFICATIONS: { value: CoachQualificationType; label: string }[] = [
+  { value: 'bt_level1_aca', label: 'British Taekwondo Level 1 ACA' },
+  { value: 'bt_level2_instructor', label: 'British Taekwondo Level 2 Instructor' },
+];
+
+export type CoachQualification = {
+  id: string;
+  club_id: string;
+  coach_id: string;
+  qualification: CoachQualificationType;
+  date_achieved: string;
+  created_at: string;
+};
+
+export type Coach = {
+  id: string;
+  club_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  rank: CoachRank;
+  dan_grade: string | null;
+  qualification_expiry: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+};
+
+export const GROUP_ABILITIES = ['Beginners', 'Intermediate', 'Advanced', 'Mixed ability', 'Other'] as const;
+
+export type SessionPlan = {
+  id: string;
+  club_id: string;
+  title: string;
+  student_count: number | null;
+  age_range: string | null;
+  group_ability: string | null;
+  group_ability_other: string | null;
+  medical_information: string | null;
+  planning_summary: string | null;
+  session_date: string;
+  session_time: string | null;
+  venue: string | null;
+  facility_requirements: string | null;
+  human_resources: string | null;
+  coach_ids: string[];
+  health_safety: string | null;
+  previous_action_points: string;
+  mentor: string | null;
+  session_goals: string | null;
+  adaptations: string | null;
+  session_summary: string | null;
+  injuries_reported: string | null;
+  series_id: string | null;
+  created_at: string;
+};
+
+export const PLAN_SECTIONS = ['Warm up', 'Main content', 'Cool down'] as const;
+export type PlanSection = (typeof PLAN_SECTIONS)[number];
+
+export type SessionPlanActivity = {
+  id: string;
+  club_id: string;
+  session_plan_id: string;
+  sort_order: number;
+  section: PlanSection;
+  timing: string | null;
+  description: string | null;
+  content_activity: string | null;
+  coaching_points: string | null;
+};
+
 export type SessionScore = {
   id: string;
   club_id: string;
