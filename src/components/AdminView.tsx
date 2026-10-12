@@ -19,6 +19,10 @@ const rankStyle: Record<CoachRank, string> = {
   trainee: 'bg-slate-100 text-slate-700',
 };
 
+type StudentSource = Pick<Coach, 'full_name' | 'email' | 'phone' | 'dan_grade' | 'date_of_birth' | 'last_grading_date' | 'bt_membership_number' | 'membership_expiry' | 'belt_size'>;
+
+const danToStudentGrade = (dan: string | null) => (parseInt(dan ?? '', 10) >= 3 ? '3-4 DAN' : '1-2 DAN');
+
 export default function AdminView({ club }: Props) {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +38,7 @@ export default function AdminView({ club }: Props) {
   const [btNumber, setBtNumber] = useState('');
   const [membershipExpiry, setMembershipExpiry] = useState('');
   const [beltSize, setBeltSize] = useState('');
+  const [notice, setNotice] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [qualifications, setQualifications] = useState<CoachQualification[]>([]);
 
@@ -56,6 +61,36 @@ export default function AdminView({ club }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Coaches also train, so each coach with an email gets a matching student record.
+  const syncStudent = async (coach: StudentSource) => {
+    if (!supabase || !coach.email) return null;
+    const email = coach.email.trim().toLowerCase();
+    const fields = {
+      student_name: coach.full_name,
+      phone: coach.phone,
+      date_of_birth: coach.date_of_birth,
+      last_grading_date: coach.last_grading_date,
+      bt_membership_number: coach.bt_membership_number,
+      membership_expiry: coach.membership_expiry,
+      belt_size: coach.belt_size,
+    };
+    const { data, error: findError } = await supabase.from('students').select('id').eq('club_id', club.id).ilike('email', email).maybeSingle();
+    if (findError) return findError.message;
+    const { error: writeError } = data
+      ? await supabase.from('students').update(fields).eq('id', data.id).eq('club_id', club.id)
+      : await supabase.from('students').insert({ ...fields, email, club_id: club.id, current_rank: danToStudentGrade(coach.dan_grade) });
+    return writeError ? writeError.message : null;
+  };
+
+  const addAllToStudents = async () => {
+    setError('');
+    setNotice('');
+    const withEmail = coaches.filter((coach) => coach.email);
+    const problems = (await Promise.all(withEmail.map(syncStudent))).filter(Boolean);
+    if (problems.length) setError(problems[0] as string);
+    else setNotice(`${withEmail.length} coach(es) added to student records.`);
+  };
 
   const resetForm = () => {
     setEditingId(null);
@@ -112,6 +147,8 @@ export default function AdminView({ club }: Props) {
       setError(insertError.message);
       return;
     }
+    const studentProblem = await syncStudent(values);
+    if (studentProblem) setError(`Coach saved, but the student record failed: ${studentProblem}`);
     resetForm();
     load();
   };
@@ -168,6 +205,10 @@ export default function AdminView({ club }: Props) {
           ))}
         </ul>
 
+        <button type="button" onClick={addAllToStudents} className="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          Add all coaches to student records
+        </button>
+        {notice && <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}
         {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
         <form onSubmit={saveCoach} className="mt-4 grid gap-3 sm:grid-cols-6">
