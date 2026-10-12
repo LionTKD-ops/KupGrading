@@ -46,6 +46,10 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
       setError('Fill in the student name and candidate ID in the profile before creating a session.');
       return;
     }
+    if (!supabase) {
+      setError('Live sessions require Supabase configuration.');
+      return;
+    }
     setLoading(true);
     setError('');
     const code = genSessionCode();
@@ -84,6 +88,10 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
     }
     if (!joinName.trim()) {
       setError('Enter your examiner name.');
+      return;
+    }
+    if (!supabase) {
+      setError('Live sessions require Supabase configuration.');
       return;
     }
     setLoading(true);

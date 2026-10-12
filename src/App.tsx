@@ -9,8 +9,9 @@ import CandidateImport from '@/components/CandidateImport';
 import CandidateList from '@/components/CandidateList';
 import LiveSessionModal from '@/components/LiveSessionModal';
 import LiveSessionView from '@/components/LiveSessionView';
-import { supabase, type Evaluation, type Candidate, type ExaminerScores } from '@/lib/supabase';
+import { supabase, supabaseConfigured, type Evaluation, type Candidate, type ExaminerScores } from '@/lib/supabase';
 import { buildModules, GRADES, getFeedbackTier, getVerdict } from '@/data/rubrics';
+import { demoCandidates, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
 import type { ParsedCandidate } from '@/lib/csvUtils';
 
@@ -34,13 +35,14 @@ const emptyProfile: ProfileData = {
 };
 
 export default function App() {
-  const [profile, setProfile] = useState<ProfileData>(emptyProfile);
-  const [examinerScores, setExaminerScores] = useState<ExaminerScores>({});
+  const [profile, setProfile] = useState<ProfileData>(supabaseConfigured ? emptyProfile : demoProfile);
+  const [examinerScores, setExaminerScores] = useState<ExaminerScores>(supabaseConfigured ? {} : demoExaminerScores);
   const [activeExaminerId, setActiveExaminerId] = useState<string | null>(null);
-  const [savedEvals, setSavedEvals] = useState<Evaluation[]>([]);
-  const [loadingEvals, setLoadingEvals] = useState(true);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(true);
+  const [savedEvals, setSavedEvals] = useState<Evaluation[]>(supabaseConfigured ? [] : demoEvaluations);
+  const [loadingEvals, setLoadingEvals] = useState(supabaseConfigured);
+  const [candidates, setCandidates] = useState<Candidate[]>(supabaseConfigured ? [] : demoCandidates);
+  const [loadingCandidates, setLoadingCandidates] = useState(supabaseConfigured);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -135,24 +137,38 @@ export default function App() {
   );
 
   const loadCandidates = useCallback(async () => {
+    if (!supabase) {
+      setCandidates(demoCandidates);
+      setLoadingCandidates(false);
+      return;
+    }
     setLoadingCandidates(true);
     const { data, error } = await supabase
       .from('candidates')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) {
+    if (error) {
+      setDataError(`Could not load candidates: ${error.message}`);
+    } else if (data) {
       setCandidates(data as Candidate[]);
     }
     setLoadingCandidates(false);
   }, []);
 
   const loadEvaluations = useCallback(async () => {
+    if (!supabase) {
+      setSavedEvals(demoEvaluations);
+      setLoadingEvals(false);
+      return;
+    }
     setLoadingEvals(true);
     const { data, error } = await supabase
       .from('evaluations')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) {
+    if (error) {
+      setDataError(`Could not load saved evaluations: ${error.message}`);
+    } else if (data) {
       setSavedEvals(data as Evaluation[]);
     }
     setLoadingEvals(false);
@@ -172,6 +188,28 @@ export default function App() {
     for (const ex of profile.examiners) {
       if (ex.name.trim()) examinerNamesMap[ex.id] = ex.name;
     }
+    const evaluation: Evaluation = {
+      id: `local-${Date.now()}`,
+      student_name: profile.studentName,
+      candidate_id: profile.candidateId,
+      current_rank: profile.currentGrade,
+      target_rank: profile.targetGrade,
+      examiner_name: namedExaminers.map((e) => e.name).join(', '),
+      examiner_names: examinerNamesMap,
+      evaluation_date: profile.date,
+      scores: examinerScores,
+      average_score: Number(combinedAverage.toFixed(2)),
+      feedback_tier: tier.tier,
+      training_advice: tier.advice,
+      verdict: verdict.label,
+      created_at: new Date().toISOString(),
+    };
+    if (!supabase) {
+      setSavedEvals((current) => [evaluation, ...current]);
+      setSaving(false);
+      setSaved(true);
+      return;
+    }
     const { error } = await supabase.from('evaluations').insert({
       student_name: profile.studentName,
       candidate_id: profile.candidateId,
@@ -187,7 +225,9 @@ export default function App() {
       verdict: verdict.label,
     });
     setSaving(false);
-    if (!error) {
+    if (error) {
+      setDataError(`Could not save evaluation: ${error.message}`);
+    } else {
       setSaved(true);
       loadEvaluations();
     }
@@ -235,8 +275,14 @@ export default function App() {
   };
 
   const handleDeleteEval = async (id: string) => {
+    if (!supabase) {
+      setSavedEvals((current) => current.filter((evaluation) => evaluation.id !== id));
+      return;
+    }
     const { error } = await supabase.from('evaluations').delete().eq('id', id);
-    if (!error) {
+    if (error) {
+      setDataError(`Could not delete evaluation: ${error.message}`);
+    } else {
       loadEvaluations();
     }
   };
@@ -271,8 +317,22 @@ export default function App() {
       examiner_name: c.examiner_name,
       notes: c.notes,
     }));
+    if (!supabase) {
+      const createdAt = new Date().toISOString();
+      setCandidates((current) => [
+        ...rows.map((candidate, index) => ({
+          ...candidate,
+          id: `local-${Date.now()}-${index}`,
+          created_at: createdAt,
+        })),
+        ...current,
+      ]);
+      return;
+    }
     const { error } = await supabase.from('candidates').insert(rows);
-    if (!error) {
+    if (error) {
+      setDataError(`Could not import candidates: ${error.message}`);
+    } else {
       loadCandidates();
     }
   };
@@ -293,8 +353,14 @@ export default function App() {
   };
 
   const handleDeleteCandidate = async (id: string) => {
+    if (!supabase) {
+      setCandidates((current) => current.filter((candidate) => candidate.id !== id));
+      return;
+    }
     const { error } = await supabase.from('candidates').delete().eq('id', id);
-    if (!error) {
+    if (error) {
+      setDataError(`Could not delete candidate: ${error.message}`);
+    } else {
       loadCandidates();
     }
   };
@@ -341,7 +407,9 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSessionModal(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md transition hover:shadow-lg"
+              disabled={!supabaseConfigured}
+              title={!supabaseConfigured ? 'Live sessions require Supabase configuration' : undefined}
+              className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Radio size={14} /> Live Session
             </button>
@@ -356,6 +424,16 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {!supabaseConfigured && (
+          <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span className="font-semibold">Demo preview:</span> sample grading data is shown so you can explore the app. Changes stay in this page only. Configure <code className="rounded bg-amber-100 px-1">VITE_SUPABASE_URL</code> and <code className="rounded bg-amber-100 px-1">VITE_SUPABASE_ANON_KEY</code> to connect your database and enable live sessions.
+          </div>
+        )}
+        {dataError && (
+          <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {dataError}
+          </div>
+        )}
         <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 shadow-lg sm:p-8">
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">

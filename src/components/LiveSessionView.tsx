@@ -62,19 +62,22 @@ export default function LiveSessionView({
   const [saving, setSaving] = useState(false);
   const [savedEval, setSavedEval] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null);
 
   // Load session and scores
   useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+
     (async () => {
-      const { data: sess } = await supabase
+      const { data: sess } = await client
         .from('assessment_sessions')
         .select('*')
         .eq('id', sessionId)
         .single();
       if (sess) setSession(sess as AssessmentSession);
 
-      const { data: sc } = await supabase
+      const { data: sc } = await client
         .from('session_scores')
         .select('*')
         .eq('session_id', sessionId);
@@ -82,7 +85,7 @@ export default function LiveSessionView({
     })();
 
     // Realtime subscriptions
-    const channel = supabase
+    const channel = client
       .channel(`session:${sessionId}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'session_scores', filter: `session_id=eq.${sessionId}` },
@@ -130,7 +133,7 @@ export default function LiveSessionView({
     channelRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      client.removeChannel(channel);
       channelRef.current = null;
     };
   }, [sessionId, myExaminerId, myExaminerName]);
@@ -202,6 +205,8 @@ export default function LiveSessionView({
 
   const handleScore = useCallback(
     async (moduleId: string, itemId: string, score: number) => {
+      if (!supabase) return;
+      const client = supabase;
       // Optimistic local update via realtime will handle it, but also upsert
       const existing = allScores.find(
         (s) => s.examiner_id === myExaminerId && s.module_id === moduleId && s.item_id === itemId
@@ -233,7 +238,7 @@ export default function LiveSessionView({
         return [...prev, newScore];
       });
 
-      await supabase
+      await client
         .from('session_scores')
         .upsert(
           {
@@ -261,12 +266,14 @@ export default function LiveSessionView({
 
   const handleSaveToEvaluations = async () => {
     if (!session) return;
+    if (!supabase) return;
+    const client = supabase;
     setSaving(true);
     const examinerNamesMap: Record<string, string> = {};
     for (const ex of examiners) {
       if (ex.name && ex.name !== 'Unknown Examiner') examinerNamesMap[ex.id] = ex.name;
     }
-    const { error } = await supabase.from('evaluations').insert({
+    const { error } = await client.from('evaluations').insert({
       student_name: session.student_name,
       candidate_id: session.candidate_id,
       current_rank: session.current_rank,
@@ -284,7 +291,7 @@ export default function LiveSessionView({
     if (!error) {
       setSavedEval(true);
       // Mark session as completed
-      await supabase.from('assessment_sessions').update({ status: 'completed' }).eq('id', sessionId);
+      await client.from('assessment_sessions').update({ status: 'completed' }).eq('id', sessionId);
     }
   };
 
