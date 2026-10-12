@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Swords, ShieldCheck, Award, RotateCcw, Radio } from 'lucide-react';
 import StudentProfileHeader, { type ProfileData } from '@/components/StudentProfileHeader';
+import ClubAccess, { type Club } from '@/components/ClubAccess';
 import AssessmentModules from '@/components/AssessmentModules';
 import FeedbackSummary from '@/components/FeedbackSummary';
 import ExportActions from '@/components/ExportActions';
@@ -35,6 +36,15 @@ const emptyProfile: ProfileData = {
 };
 
 export default function App() {
+  if (!supabaseConfigured) return <GradingApp club={null} />;
+  return (
+    <ClubAccess>
+      {(club) => <GradingApp club={club} />}
+    </ClubAccess>
+  );
+}
+
+function GradingApp({ club }: { club: Club | null }) {
   const [profile, setProfile] = useState<ProfileData>(supabaseConfigured ? emptyProfile : demoProfile);
   const [examinerScores, setExaminerScores] = useState<ExaminerScores>(supabaseConfigured ? {} : demoExaminerScores);
   const [activeExaminerId, setActiveExaminerId] = useState<string | null>(null);
@@ -146,6 +156,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('students')
       .select('*')
+      .eq('club_id', club?.id ?? '')
       .order('created_at', { ascending: false });
     if (error) {
       setDataError(`Could not load students: ${error.message}`);
@@ -153,7 +164,7 @@ export default function App() {
       setStudents(data as Student[]);
     }
     setLoadingStudents(false);
-  }, []);
+  }, [club?.id]);
 
   const loadEvaluations = useCallback(async () => {
     if (!supabase) {
@@ -165,6 +176,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('evaluations')
       .select('*')
+      .eq('club_id', club?.id ?? '')
       .order('created_at', { ascending: false });
     if (error) {
       setDataError(`Could not load saved evaluations: ${error.message}`);
@@ -172,7 +184,7 @@ export default function App() {
       setSavedEvals(data as Evaluation[]);
     }
     setLoadingEvals(false);
-  }, []);
+  }, [club?.id]);
 
   useEffect(() => {
     loadEvaluations();
@@ -190,6 +202,7 @@ export default function App() {
     }
     const evaluation: Evaluation = {
       id: `local-${Date.now()}`,
+      club_id: club?.id ?? 'demo-club',
       student_name: profile.studentName,
       candidate_id: profile.candidateId,
       current_rank: profile.currentGrade,
@@ -211,6 +224,7 @@ export default function App() {
       return;
     }
     const { error } = await supabase.from('evaluations').insert({
+      club_id: club?.id,
       student_name: profile.studentName,
       candidate_id: profile.candidateId,
       current_rank: profile.currentGrade,
@@ -279,7 +293,7 @@ export default function App() {
       setSavedEvals((current) => current.filter((evaluation) => evaluation.id !== id));
       return;
     }
-    const { error } = await supabase.from('evaluations').delete().eq('id', id);
+    const { error } = await supabase.from('evaluations').delete().eq('id', id).eq('club_id', club?.id ?? '');
     if (error) {
       setDataError(`Could not delete evaluation: ${error.message}`);
     } else {
@@ -310,6 +324,7 @@ export default function App() {
 
   const handleImportStudents = async (parsed: ParsedStudent[]) => {
     const rows = parsed.map((c) => ({
+      club_id: club?.id,
       student_name: c.student_name,
       candidate_id: c.candidate_id,
       current_rank: c.current_rank,
@@ -322,6 +337,7 @@ export default function App() {
       setStudents((current) => [
         ...rows.map((candidate, index) => ({
           ...candidate,
+          club_id: 'demo-club',
           id: `local-${Date.now()}-${index}`,
           created_at: createdAt,
         })),
@@ -356,7 +372,7 @@ export default function App() {
       setStudents((current) => current.filter((student) => student.id !== id));
       return;
     }
-    const { error } = await supabase.from('students').delete().eq('id', id);
+    const { error } = await supabase.from('students').delete().eq('id', id).eq('club_id', club?.id ?? '');
     if (error) {
       setDataError(`Could not delete student: ${error.message}`);
     } else {
@@ -371,6 +387,7 @@ export default function App() {
     return (
       <LiveSessionView
         sessionId={liveSession.sessionId}
+        clubId={club?.id ?? ''}
         sessionCode={liveSession.sessionCode}
         myExaminerId={liveSession.examinerId}
         myExaminerName={liveSession.examinerName}
@@ -385,6 +402,7 @@ export default function App() {
       {showSessionModal && (
         <LiveSessionModal
           profile={profile}
+          clubId={club?.id ?? ''}
           onClose={() => setShowSessionModal(false)}
           onSessionCreated={handleSessionCreated}
           onSessionJoined={handleSessionJoined}
@@ -401,6 +419,11 @@ export default function App() {
                 Martial Arts Grading
               </h1>
               <p className="hidden text-xs text-slate-500 sm:block">Multi-Examiner Assessment & Evaluation System</p>
+              {club && (
+                <p className="text-[11px] text-slate-500">
+                  {club.name} · Staff join code: <span className="font-mono font-semibold">{club.join_code}</span>
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -418,6 +441,18 @@ export default function App() {
             >
               <RotateCcw size={14} /> Reset
             </button>
+            {club && (
+              <button
+                onClick={async () => {
+                  if (!supabase) return;
+                  const { error } = await supabase.auth.signOut();
+                  if (error) setDataError(`Could not sign out: ${error.message}`);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       </header>

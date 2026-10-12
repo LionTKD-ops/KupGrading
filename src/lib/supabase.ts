@@ -13,6 +13,7 @@ export type ExaminerScores = Record<string, Record<string, Record<string, number
 
 export type Evaluation = {
   id: string;
+  club_id: string;
   student_name: string;
   candidate_id: string;
   current_rank: string;
@@ -30,6 +31,7 @@ export type Evaluation = {
 
 export type Student = {
   id: string;
+  club_id: string;
   student_name: string;
   candidate_id: string;
   current_rank: string;
@@ -41,6 +43,7 @@ export type Student = {
 
 export type AssessmentSession = {
   id: string;
+  club_id: string;
   session_code: string;
   student_name: string;
   candidate_id: string;
@@ -55,6 +58,7 @@ export type AssessmentSession = {
 
 export type SessionScore = {
   id: string;
+  club_id: string;
   session_id: string;
   examiner_id: string;
   examiner_name: string;

@@ -32,6 +32,7 @@ export const demoExaminerScores = demoScores;
 export const demoStudents: Student[] = [
   {
     id: 'demo-candidate-1',
+    club_id: 'demo-club',
     student_name: 'Alex Morgan',
     candidate_id: 'DEMO-001',
     current_rank: '4-3 KUP',
@@ -42,6 +43,7 @@ export const demoStudents: Student[] = [
   },
   {
     id: 'demo-candidate-2',
+    club_id: 'demo-club',
     student_name: 'Jamie Chen',
     candidate_id: 'DEMO-002',
     current_rank: '8-7 KUP',
@@ -55,6 +57,7 @@ export const demoStudents: Student[] = [
 export const demoEvaluations: Evaluation[] = [
   {
     id: 'demo-evaluation-1',
+    club_id: 'demo-club',
     student_name: demoProfile.studentName,
     candidate_id: demoProfile.candidateId,
     current_rank: demoProfile.currentGrade,

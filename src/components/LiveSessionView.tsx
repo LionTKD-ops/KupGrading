@@ -8,6 +8,7 @@ import type { ProfileData } from '@/components/StudentProfileHeader';
 
 type Props = {
   sessionId: string;
+  clubId: string;
   sessionCode: string;
   myExaminerId: string;
   myExaminerName: string;
@@ -49,6 +50,7 @@ function scoreColorHex(s: number): string {
 
 export default function LiveSessionView({
   sessionId,
+  clubId,
   sessionCode,
   myExaminerId,
   myExaminerName,
@@ -74,13 +76,15 @@ export default function LiveSessionView({
         .from('assessment_sessions')
         .select('*')
         .eq('id', sessionId)
+        .eq('club_id', clubId)
         .single();
       if (sess) setSession(sess as AssessmentSession);
 
       const { data: sc } = await client
         .from('session_scores')
         .select('*')
-        .eq('session_id', sessionId);
+        .eq('session_id', sessionId)
+        .eq('club_id', clubId);
       if (sc) setAllScores(sc as SessionScore[]);
     })();
 
@@ -136,7 +140,7 @@ export default function LiveSessionView({
       client.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [sessionId, myExaminerId, myExaminerName]);
+  }, [sessionId, myExaminerId, myExaminerName, clubId]);
 
   const maxScore = session?.target_mark ?? 1;
   const currentGrade = (session?.current_rank ?? '10-9 KUP') as GradeKey;
@@ -222,6 +226,7 @@ export default function LiveSessionView({
           ? { ...existing, score }
           : {
               id: `temp-${Date.now()}`,
+              club_id: clubId,
               session_id: sessionId,
               examiner_id: myExaminerId,
               examiner_name: myExaminerName,
@@ -242,6 +247,7 @@ export default function LiveSessionView({
         .from('session_scores')
         .upsert(
           {
+            club_id: clubId,
             session_id: sessionId,
             examiner_id: myExaminerId,
             examiner_name: myExaminerName,
@@ -253,7 +259,7 @@ export default function LiveSessionView({
           { onConflict: 'session_id,examiner_id,module_id,item_id' }
         );
     },
-    [allScores, myExaminerId, myExaminerName, sessionId],
+    [allScores, myExaminerId, myExaminerName, sessionId, clubId],
   );
 
   const displayCode = sessionCode || session?.session_code || '';
@@ -274,6 +280,7 @@ export default function LiveSessionView({
       if (ex.name && ex.name !== 'Unknown Examiner') examinerNamesMap[ex.id] = ex.name;
     }
     const { error } = await client.from('evaluations').insert({
+      club_id: clubId,
       student_name: session.student_name,
       candidate_id: session.candidate_id,
       current_rank: session.current_rank,
@@ -291,7 +298,7 @@ export default function LiveSessionView({
     if (!error) {
       setSavedEval(true);
       // Mark session as completed
-      await client.from('assessment_sessions').update({ status: 'completed' }).eq('id', sessionId);
+      await client.from('assessment_sessions').update({ status: 'completed' }).eq('id', sessionId).eq('club_id', clubId);
     }
   };
 

@@ -6,6 +6,7 @@ import type { ProfileData } from '@/components/StudentProfileHeader';
 
 type Props = {
   profile: ProfileData;
+  clubId: string;
   onClose: () => void;
   onSessionCreated: (sessionId: string, sessionCode: string, examinerId: string, examinerName: string) => void;
   onSessionJoined: (sessionId: string, examinerId: string, examinerName: string) => void;
@@ -27,7 +28,7 @@ function genExaminerId(): string {
 const inputClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none placeholder:text-slate-400';
 
-export default function LiveSessionModal({ profile, onClose, onSessionCreated, onSessionJoined }: Props) {
+export default function LiveSessionModal({ profile, clubId, onClose, onSessionCreated, onSessionJoined }: Props) {
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [hostName, setHostName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -59,6 +60,7 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
     const { data, error: insertError } = await supabase
       .from('assessment_sessions')
       .insert({
+        club_id: clubId,
         session_code: code,
         student_name: profile.studentName,
         candidate_id: profile.candidateId,
@@ -102,6 +104,7 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
       .from('assessment_sessions')
       .select('*')
       .eq('session_code', code)
+      .eq('club_id', clubId)
       .eq('status', 'active')
       .maybeSingle();
 
@@ -115,10 +118,16 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
     const existingNames = (session.examiner_names as Record<string, string>) ?? {};
     const updatedNames = { ...existingNames, [examinerId]: joinName.trim() };
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('assessment_sessions')
       .update({ examiner_names: updatedNames })
-      .eq('id', session.id);
+      .eq('id', session.id)
+      .eq('club_id', clubId);
+    if (updateError) {
+      setLoading(false);
+      setError(`Could not join the session: ${updateError.message}`);
+      return;
+    }
 
     setLoading(false);
     onSessionJoined(session.id, examinerId, joinName.trim());
