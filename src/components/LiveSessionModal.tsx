@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Radio, X, Plus, LogIn, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { GRADES, type GradeKey } from '@/data/rubrics';
-import type { ProfileData } from '@/components/CandidateProfileHeader';
+import type { ProfileData } from '@/components/StudentProfileHeader';
 
 type Props = {
   profile: ProfileData;
@@ -193,7 +193,7 @@ export default function LiveSessionModal({ profile, onClose, onSessionCreated, o
               <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="font-semibold text-slate-700">Session details:</p>
                 <p className="mt-1">Student: {profile.studentName || '—'}</p>
-                <p>Candidate ID: {profile.candidateId || '—'}</p>
+                <p>Student ID: {profile.candidateId || '—'}</p>
                 <p>Grade: {profile.currentGrade}</p>
               </div>
               <div>

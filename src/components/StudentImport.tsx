@@ -1,17 +1,17 @@
 import { useState, useRef } from 'react';
 import { Upload, Link2, FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Download, X } from 'lucide-react';
-import { parseCandidatesCSV, googleSheetsURLToCSV, generateSampleCSV, type ParsedCandidate } from '@/lib/csvUtils';
+import { parseStudentsCSV, googleSheetsURLToCSV, generateSampleStudentsCSV, type ParsedStudent } from '@/lib/csvUtils';
 
 type Props = {
-  onImport: (candidates: ParsedCandidate[]) => Promise<void>;
+  onImport: (students: ParsedStudent[]) => Promise<void>;
 };
 
 type Status = 'idle' | 'parsing' | 'fetching' | 'preview' | 'importing' | 'import-error' | 'error' | 'success';
 
-export default function CandidateImport({ onImport }: Props) {
+export default function StudentImport({ onImport }: Props) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const [preview, setPreview] = useState<ParsedCandidate[]>([]);
+  const [preview, setPreview] = useState<ParsedStudent[]>([]);
   const [sheetUrl, setSheetUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -21,13 +21,13 @@ export default function CandidateImport({ onImport }: Props) {
     setErrorMsg('');
     try {
       const text = await file.text();
-      const candidates = parseCandidatesCSV(text);
-      if (candidates.length === 0) {
+      const students = parseStudentsCSV(text);
+      if (students.length === 0) {
         setStatus('error');
-        setErrorMsg('No valid candidates found in the file. Make sure it has a header row with at least "Student Name" and "Candidate ID" columns.');
+        setErrorMsg('No valid students found in the file. Make sure it has a header row with at least "Student Name" and "Student ID" columns.');
         return;
       }
-      setPreview(candidates);
+      setPreview(students);
       setStatus('preview');
     } catch {
       setStatus('error');
@@ -64,13 +64,13 @@ export default function CandidateImport({ onImport }: Props) {
         return;
       }
       const text = await resp.text();
-      const candidates = parseCandidatesCSV(text);
-      if (candidates.length === 0) {
+      const students = parseStudentsCSV(text);
+      if (students.length === 0) {
         setStatus('error');
-        setErrorMsg('No valid candidates found in the sheet. Make sure the first row has headers like "Student Name" and "Candidate ID".');
+        setErrorMsg('No valid students found in the sheet. Make sure the first row has headers like "Student Name" and "Student ID".');
         return;
       }
-      setPreview(candidates);
+      setPreview(students);
       setStatus('preview');
     } catch {
       setStatus('error');
@@ -88,7 +88,7 @@ export default function CandidateImport({ onImport }: Props) {
       setTimeout(() => setStatus('idle'), 3000);
     } catch (error) {
       setStatus('import-error');
-      setErrorMsg(error instanceof Error ? error.message : 'Could not import candidates. Please try again.');
+      setErrorMsg(error instanceof Error ? error.message : 'Could not import students. Please try again.');
     }
   };
 
@@ -98,11 +98,11 @@ export default function CandidateImport({ onImport }: Props) {
   };
 
   const handleDownloadSample = () => {
-    const blob = new Blob([generateSampleCSV()], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([generateSampleStudentsCSV()], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'candidate_import_template.csv';
+    a.download = 'student_import_template.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -120,7 +120,7 @@ export default function CandidateImport({ onImport }: Props) {
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
         <Upload size={18} className="text-amber-600" />
-        <h3 className="text-sm font-bold text-slate-900">Import Candidates</h3>
+        <h3 className="text-sm font-bold text-slate-900">Import Students</h3>
       </div>
 
       <div className="p-5">
@@ -128,14 +128,14 @@ export default function CandidateImport({ onImport }: Props) {
           <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3">
             <CheckCircle2 size={20} className="text-emerald-600" />
             <p className="text-sm font-semibold text-emerald-800">
-              Candidates imported successfully!
+              Students imported successfully!
             </p>
           </div>
         ) : status === 'preview' || status === 'importing' || status === 'import-error' ? (
           <div>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-700">
-                Preview ({preview.length} candidate{preview.length !== 1 ? 's' : ''})
+                Preview ({preview.length} student{preview.length !== 1 ? 's' : ''})
               </p>
               <button
                 onClick={handleCancelPreview}
@@ -149,20 +149,20 @@ export default function CandidateImport({ onImport }: Props) {
                 <thead className="sticky top-0 bg-slate-50">
                   <tr className="text-left text-slate-500">
                     <th className="px-3 py-2 font-semibold">Name</th>
-                    <th className="px-3 py-2 font-semibold">ID</th>
+                    <th className="px-3 py-2 font-semibold">Student ID</th>
                     <th className="px-3 py-2 font-semibold">Grade</th>
                     <th className="px-3 py-2 font-semibold">Target</th>
                     <th className="px-3 py-2 font-semibold">Examiner</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {preview.map((c, i) => (
+                  {preview.map((student, i) => (
                     <tr key={i} className="text-slate-700">
-                      <td className="px-3 py-2 font-medium">{c.student_name}</td>
-                      <td className="px-3 py-2 font-mono text-slate-500">{c.candidate_id}</td>
-                      <td className="px-3 py-2">{c.current_rank}</td>
-                      <td className="px-3 py-2">{c.target_rank}</td>
-                      <td className="px-3 py-2">{c.examiner_name || '—'}</td>
+                      <td className="px-3 py-2 font-medium">{student.student_name}</td>
+                      <td className="px-3 py-2 font-mono text-slate-500">{student.candidate_id}</td>
+                      <td className="px-3 py-2">{student.current_rank}</td>
+                      <td className="px-3 py-2">{student.target_rank}</td>
+                      <td className="px-3 py-2">{student.examiner_name || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -176,7 +176,7 @@ export default function CandidateImport({ onImport }: Props) {
               >
                 {status === 'importing'
                   ? 'Importing...'
-                  : `Import ${preview.length} Candidate${preview.length !== 1 ? 's' : ''}`}
+                  : `Import ${preview.length} Student${preview.length !== 1 ? 's' : ''}`}
               </button>
               <button
                 onClick={handleCancelPreview}
@@ -221,7 +221,7 @@ export default function CandidateImport({ onImport }: Props) {
                     Drop a CSV file here or click to browse
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Columns: Student Name, Candidate ID, Current Grade, Target Grade, Examiner, Notes
+                    Columns: Student Name, Student ID, Current Grade, Target Grade, Examiner, Notes
                   </p>
                 </>
               )}

@@ -28,7 +28,7 @@ export type Evaluation = {
   created_at: string;
 };
 
-export type Candidate = {
+export type Student = {
   id: string;
   student_name: string;
   candidate_id: string;

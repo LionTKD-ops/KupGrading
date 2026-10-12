@@ -1,19 +1,19 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Swords, ShieldCheck, Award, RotateCcw, Radio } from 'lucide-react';
-import CandidateProfileHeader, { type ProfileData } from '@/components/CandidateProfileHeader';
+import StudentProfileHeader, { type ProfileData } from '@/components/StudentProfileHeader';
 import AssessmentModules from '@/components/AssessmentModules';
 import FeedbackSummary from '@/components/FeedbackSummary';
 import ExportActions from '@/components/ExportActions';
 import SavedEvaluations from '@/components/SavedEvaluations';
-import CandidateImport from '@/components/CandidateImport';
-import CandidateList from '@/components/CandidateList';
+import StudentImport from '@/components/StudentImport';
+import StudentList from '@/components/StudentList';
 import LiveSessionModal from '@/components/LiveSessionModal';
 import LiveSessionView from '@/components/LiveSessionView';
-import { supabase, supabaseConfigured, type Evaluation, type Candidate, type ExaminerScores } from '@/lib/supabase';
+import { supabase, supabaseConfigured, type Evaluation, type Student, type ExaminerScores } from '@/lib/supabase';
 import { buildModules, GRADES, getFeedbackTier, getVerdict } from '@/data/rubrics';
-import { demoCandidates, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
+import { demoStudents, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
-import type { ParsedCandidate } from '@/lib/csvUtils';
+import type { ParsedStudent } from '@/lib/csvUtils';
 
 type LiveSessionState = {
   sessionId: string;
@@ -40,8 +40,8 @@ export default function App() {
   const [activeExaminerId, setActiveExaminerId] = useState<string | null>(null);
   const [savedEvals, setSavedEvals] = useState<Evaluation[]>(supabaseConfigured ? [] : demoEvaluations);
   const [loadingEvals, setLoadingEvals] = useState(supabaseConfigured);
-  const [candidates, setCandidates] = useState<Candidate[]>(supabaseConfigured ? [] : demoCandidates);
-  const [loadingCandidates, setLoadingCandidates] = useState(supabaseConfigured);
+  const [students, setStudents] = useState<Student[]>(supabaseConfigured ? [] : demoStudents);
+  const [loadingStudents, setLoadingStudents] = useState(supabaseConfigured);
   const [dataError, setDataError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -136,23 +136,23 @@ export default function App() {
     [profile.currentGrade],
   );
 
-  const loadCandidates = useCallback(async () => {
+  const loadStudents = useCallback(async () => {
     if (!supabase) {
-      setCandidates(demoCandidates);
-      setLoadingCandidates(false);
+      setStudents(demoStudents);
+      setLoadingStudents(false);
       return;
     }
-    setLoadingCandidates(true);
+    setLoadingStudents(true);
     const { data, error } = await supabase
-      .from('candidates')
+      .from('students')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) {
-      setDataError(`Could not load candidates: ${error.message}`);
+      setDataError(`Could not load students: ${error.message}`);
     } else if (data) {
-      setCandidates(data as Candidate[]);
+      setStudents(data as Student[]);
     }
-    setLoadingCandidates(false);
+    setLoadingStudents(false);
   }, []);
 
   const loadEvaluations = useCallback(async () => {
@@ -176,8 +176,8 @@ export default function App() {
 
   useEffect(() => {
     loadEvaluations();
-    loadCandidates();
-  }, [loadEvaluations, loadCandidates]);
+    loadStudents();
+  }, [loadEvaluations, loadStudents]);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -308,7 +308,7 @@ export default function App() {
     setLiveSession(null);
   };
 
-  const handleImportCandidates = async (parsed: ParsedCandidate[]) => {
+  const handleImportStudents = async (parsed: ParsedStudent[]) => {
     const rows = parsed.map((c) => ({
       student_name: c.student_name,
       candidate_id: c.candidate_id,
@@ -319,7 +319,7 @@ export default function App() {
     }));
     if (!supabase) {
       const createdAt = new Date().toISOString();
-      setCandidates((current) => [
+      setStudents((current) => [
         ...rows.map((candidate, index) => ({
           ...candidate,
           id: `local-${Date.now()}-${index}`,
@@ -329,14 +329,14 @@ export default function App() {
       ]);
       return;
     }
-    const { error } = await supabase.from('candidates').insert(rows);
+    const { error } = await supabase.from('students').insert(rows);
     if (error) {
-      throw new Error(`Could not import candidates: ${error.message}`);
+      throw new Error(`Could not import students: ${error.message}`);
     }
-    await loadCandidates();
+    await loadStudents();
   };
 
-  const handleSelectCandidate = (c: Candidate) => {
+  const handleSelectStudent = (c: Student) => {
     setProfile({
       studentName: c.student_name,
       candidateId: c.candidate_id,
@@ -351,16 +351,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeleteCandidate = async (id: string) => {
+  const handleDeleteStudent = async (id: string) => {
     if (!supabase) {
-      setCandidates((current) => current.filter((candidate) => candidate.id !== id));
+      setStudents((current) => current.filter((student) => student.id !== id));
       return;
     }
-    const { error } = await supabase.from('candidates').delete().eq('id', id);
+    const { error } = await supabase.from('students').delete().eq('id', id);
     if (error) {
-      setDataError(`Could not delete candidate: ${error.message}`);
+      setDataError(`Could not delete student: ${error.message}`);
     } else {
-      loadCandidates();
+      loadStudents();
     }
   };
 
@@ -458,7 +458,7 @@ export default function App() {
           </div>
         </div>
 
-        <CandidateProfileHeader data={profile} onChange={handleProfileChange} />
+        <StudentProfileHeader data={profile} onChange={handleProfileChange} />
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
@@ -505,18 +505,18 @@ export default function App() {
               />
               {!canSave && (
                 <p className="mt-3 text-xs text-slate-400">
-                  Fill in the candidate name, ID, add at least one examiner with a name, and score at least one item.
+                  Fill in the student name, ID, add at least one examiner with a name, and score at least one item.
                 </p>
               )}
             </div>
 
-            <CandidateImport onImport={handleImportCandidates} />
+            <StudentImport onImport={handleImportStudents} />
 
-            <CandidateList
-              candidates={candidates}
-              loading={loadingCandidates}
-              onSelect={handleSelectCandidate}
-              onDelete={handleDeleteCandidate}
+            <StudentList
+              students={students}
+              loading={loadingStudents}
+              onSelect={handleSelectStudent}
+              onDelete={handleDeleteStudent}
             />
 
             <SavedEvaluations

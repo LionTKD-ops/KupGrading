@@ -1,4 +1,4 @@
-import type { ProfileData } from '@/components/CandidateProfileHeader';
+import type { ProfileData } from '@/components/StudentProfileHeader';
 import type { ExaminerScores } from '@/lib/supabase';
 import { buildModules, getFeedbackTier, getVerdict, GRADES, scoreColorIndex } from '@/data/rubrics';
 
@@ -23,7 +23,7 @@ export function exportCSV(data: ExportData) {
   const rows: string[][] = [];
   rows.push(['Field', 'Value']);
   rows.push(['Student Name', profile.studentName]);
-  rows.push(['Candidate ID', profile.candidateId]);
+  rows.push(['Student ID', profile.candidateId]);
   rows.push(['Current Grade', profile.currentGrade]);
   rows.push(['Target Grade', profile.targetGrade]);
   rows.push(['Max Score', String(maxScore)]);
@@ -234,7 +234,7 @@ export function exportPDF(data: ExportData) {
 
     <div class="info-grid">
       <div class="info-item"><div class="info-label">Student Name</div><div class="info-value">${escapeHtml(profile.studentName || '—')}</div></div>
-      <div class="info-item"><div class="info-label">Candidate ID</div><div class="info-value">${escapeHtml(profile.candidateId || '—')}</div></div>
+      <div class="info-item"><div class="info-label">Student ID</div><div class="info-value">${escapeHtml(profile.candidateId || '—')}</div></div>
       <div class="info-item"><div class="info-label">Current Grade</div><div class="info-value">${escapeHtml(profile.currentGrade)}</div></div>
       <div class="info-item"><div class="info-label">Target Grade</div><div class="info-value">${escapeHtml(profile.targetGrade)}</div></div>
       <div class="info-item"><div class="info-label">Examiners</div><div class="info-value">${escapeHtml(examinerNamesJoined || '—')}</div></div>

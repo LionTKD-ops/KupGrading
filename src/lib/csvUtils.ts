@@ -1,6 +1,6 @@
 import { GRADES } from '@/data/rubrics';
 
-export type ParsedCandidate = {
+export type ParsedStudent = {
   student_name: string;
   candidate_id: string;
   current_rank: string;
@@ -10,16 +10,17 @@ export type ParsedCandidate = {
 };
 
 // Map various header name variations to canonical field keys
-const headerAliases: Record<string, keyof ParsedCandidate> = {
+const headerAliases: Record<string, keyof ParsedStudent> = {
   student_name: 'student_name',
   name: 'student_name',
   'student name': 'student_name',
   fullname: 'student_name',
   'full name': 'student_name',
+  student_id: 'candidate_id',
+  'student id': 'candidate_id',
   candidate_id: 'candidate_id',
   'candidate id': 'candidate_id',
   id: 'candidate_id',
-  'student id': 'candidate_id',
   registration: 'candidate_id',
   current_rank: 'current_rank',
   'current rank': 'current_rank',
@@ -110,12 +111,12 @@ function parseCSV(csvText: string): string[][] {
   return rows;
 }
 
-export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
+export function parseStudentsCSV(csvText: string): ParsedStudent[] {
   const rows = parseCSV(csvText);
   if (rows.length < 2) return [];
 
   const headerFields = rows[0].map((h) => h.replace(/^\uFEFF/, '').toLowerCase());
-  const colMap: Record<number, keyof ParsedCandidate> = {};
+  const colMap: Record<number, keyof ParsedStudent> = {};
 
   headerFields.forEach((header, idx) => {
     const canonical = headerAliases[header];
@@ -127,16 +128,16 @@ export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
   const hasNameHeader = Object.values(colMap).includes('student_name');
   const hasIdHeader = Object.values(colMap).includes('candidate_id');
 
-  const candidates: ParsedCandidate[] = [];
+  const students: ParsedStudent[] = [];
 
   for (let i = 1; i < rows.length; i++) {
     const fields = rows[i];
 
-    let candidate: ParsedCandidate;
+    let student: ParsedStudent;
 
     if (hasNameHeader || hasIdHeader) {
       // Header-based mapping
-      candidate = {
+      student = {
         student_name: '',
         candidate_id: '',
         current_rank: '10-9 KUP',
@@ -148,18 +149,18 @@ export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
         const key = colMap[idx];
         if (!key) return;
         if (key === 'current_rank') {
-          candidate[key] = normalizeGrade(value);
+          student[key] = normalizeGrade(value);
         } else if (key === 'target_rank') {
-          candidate[key] = value ? normalizeGrade(value) : '';
+          student[key] = value ? normalizeGrade(value) : '';
         } else if (key === 'examiner_name' || key === 'notes') {
-          candidate[key] = value || null;
+          student[key] = value || null;
         } else {
-          candidate[key] = value;
+          student[key] = value;
         }
       });
     } else {
       // Positional fallback: Name, ID, CurrentGrade, TargetGrade, Examiner, Notes
-      candidate = {
+      student = {
         student_name: fields[0] || '',
         candidate_id: fields[1] || '',
         current_rank: normalizeGrade(fields[2] || '10-9 KUP'),
@@ -169,16 +170,16 @@ export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
       };
     }
 
-    if (!candidate.student_name && !candidate.candidate_id) continue;
-    if (!candidate.student_name) candidate.student_name = `Candidate ${candidate.candidate_id}`;
-    if (!candidate.candidate_id) candidate.candidate_id = `CAND-${Date.now()}-${i}`;
-    if (!candidate.current_rank) candidate.current_rank = '10-9 KUP';
-    if (!candidate.target_rank) candidate.target_rank = inferTargetGrade(candidate.current_rank);
+    if (!student.student_name && !student.candidate_id) continue;
+    if (!student.student_name) student.student_name = `Student ${student.candidate_id}`;
+    if (!student.candidate_id) student.candidate_id = `STU-${Date.now()}-${i}`;
+    if (!student.current_rank) student.current_rank = '10-9 KUP';
+    if (!student.target_rank) student.target_rank = inferTargetGrade(student.current_rank);
 
-    candidates.push(candidate);
+    students.push(student);
   }
 
-  return candidates;
+  return students;
 }
 
 // Convert a Google Sheets sharing URL to a CSV export URL
@@ -198,8 +199,8 @@ export function isGradeValid(grade: string): boolean {
   return gradeKeys.includes(grade.toLowerCase()) || gradeLabels.includes(grade.toLowerCase());
 }
 
-export function generateSampleCSV(): string {
-  const headers = 'Student Name,Candidate ID,Current Grade,Target Grade,Examiner Name,Notes';
+export function generateSampleStudentsCSV(): string {
+  const headers = 'Student Name,Student ID,Current Grade,Target Grade,Examiner Name,Notes';
   const rows = [
     'Jane Doe,TKD-2026-001,10-9 KUP,8-7 KUP,Master Kim,',
     'John Smith,TKD-2026-002,8-7 KUP,6-5 KUP,Master Kim,Focus on stances',

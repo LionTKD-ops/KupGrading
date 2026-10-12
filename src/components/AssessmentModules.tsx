@@ -53,7 +53,7 @@ export default function AssessmentModules({
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <p className="text-sm text-slate-400">
-          Add at least one examiner in the Candidate Profile above to begin scoring.
+          Add at least one examiner in the Student Profile above to begin scoring.
         </p>
       </div>
     );

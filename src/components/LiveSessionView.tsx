@@ -4,7 +4,7 @@ import { supabase, type AssessmentSession, type SessionScore } from '@/lib/supab
 import { buildModules, getFeedbackTier, getVerdict, GRADES, scoreColorIndex, type AssessmentModule, type GradeKey } from '@/data/rubrics';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
 import type { ExaminerScores } from '@/lib/supabase';
-import type { ProfileData } from '@/components/CandidateProfileHeader';
+import type { ProfileData } from '@/components/StudentProfileHeader';
 
 type Props = {
   sessionId: string;
@@ -493,7 +493,7 @@ export default function LiveSessionView({
             </span>
           </div>
           <div className="h-4 w-px bg-slate-200" />
-          <span className="text-xs font-semibold text-slate-500">Candidate ID: {session.candidate_id}</span>
+          <span className="text-xs font-semibold text-slate-500">Student ID: {session.candidate_id}</span>
           <div className="h-4 w-px bg-slate-200" />
           <span className="text-xs font-semibold text-slate-500">Grade: {session.current_rank} → {session.target_rank}</span>
           <div className="h-4 w-px bg-slate-200" />

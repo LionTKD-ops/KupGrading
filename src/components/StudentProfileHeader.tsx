@@ -28,7 +28,7 @@ function makeExaminerId() {
   return `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export default function CandidateProfileHeader({ data, onChange }: Props) {
+export default function StudentProfileHeader({ data, onChange }: Props) {
   const currentGradeInfo = GRADES.find((r) => r.key === data.currentGrade);
   const targetGradeOptions = GRADES.filter((r) => r.maxScore > (currentGradeInfo?.maxScore ?? 0));
 
@@ -58,8 +58,8 @@ export default function CandidateProfileHeader({ data, onChange }: Props) {
           <ClipboardCheck size={20} />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Candidate Profile</h2>
-          <p className="text-sm text-slate-500">Enter the candidate and assessment details below</p>
+          <h2 className="text-lg font-bold text-slate-900">Student Profile</h2>
+          <p className="text-sm text-slate-500">Enter the student and assessment details below</p>
         </div>
       </div>
 
@@ -79,7 +79,7 @@ export default function CandidateProfileHeader({ data, onChange }: Props) {
 
         <div>
           <label className={labelClass}>
-            <IdCard size={14} /> Candidate ID
+            <IdCard size={14} /> Student ID
           </label>
           <input
             type="text"

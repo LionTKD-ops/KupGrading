@@ -1,5 +1,5 @@
-import type { ProfileData } from '@/components/CandidateProfileHeader';
-import type { Candidate, Evaluation, ExaminerScores } from '@/lib/supabase';
+import type { ProfileData } from '@/components/StudentProfileHeader';
+import type { Student, Evaluation, ExaminerScores } from '@/lib/supabase';
 
 const demoExaminerId = 'demo-examiner';
 const demoScores: ExaminerScores = {
@@ -29,7 +29,7 @@ export const demoProfile: ProfileData = {
 
 export const demoExaminerScores = demoScores;
 
-export const demoCandidates: Candidate[] = [
+export const demoStudents: Student[] = [
   {
     id: 'demo-candidate-1',
     student_name: 'Alex Morgan',
@@ -37,7 +37,7 @@ export const demoCandidates: Candidate[] = [
     current_rank: '4-3 KUP',
     target_rank: '2-1 KUP',
     examiner_name: 'Master Lee',
-    notes: 'Sample candidate for preview',
+    notes: 'Sample student for preview',
     created_at: `${demoDate}T09:00:00.000Z`,
   },
   {
@@ -47,7 +47,7 @@ export const demoCandidates: Candidate[] = [
     current_rank: '8-7 KUP',
     target_rank: '6-5 KUP',
     examiner_name: 'Master Patel',
-    notes: 'Sample candidate for preview',
+    notes: 'Sample student for preview',
     created_at: `${demoDate}T08:00:00.000Z`,
   },
 ];
