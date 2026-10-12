@@ -17,3 +17,13 @@ WHERE name = 'Existing club records';
 ```
 
 Share that code only with authorized staff. Row-level security restricts student and grading records to authenticated members of their club.
+
+## Automatic Google Calendar sync
+
+Session plans can sync to a club admin's Google Calendar through the Netlify function `netlify/functions/google-calendar.mjs`. Run migration `20261012160000_add_google_calendar_links.sql`, then:
+
+1. In Google Cloud Console, create a project, enable the **Google Calendar API**, configure the OAuth consent screen, and create an **OAuth client ID** of type *Web application*. Add this authorised redirect URI: `https://<your-site>/.netlify/functions/google-calendar`.
+2. In Netlify, set these environment variables (server-side only, never `VITE_` prefixed): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, and optionally `SITE_URL` (defaults to Netlify's `URL`) and `CALENDAR_TIME_ZONE` (default `Europe/London`).
+3. Redeploy, open **Session planning**, and use **Connect Google Calendar** signed in as the admin account.
+
+The Google refresh token is stored in `google_calendar_links`, which only the service role can read. The service-role key is used only inside the Netlify function.

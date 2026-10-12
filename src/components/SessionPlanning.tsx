@@ -10,6 +10,8 @@ import {
   type SessionPlan,
   type SessionPlanActivity,
 } from '@/lib/supabase';
+import Timetable from '@/components/Timetable';
+import { autoSyncCalendar } from '@/lib/googleCalendar';
 import { SAMPLE_PLAN_CSV, parsePlanCSV, type ParsedPlanSession, type PlanActivityInput } from '@/lib/planCsv';
 
 const emptyActivity: PlanActivityInput = {
@@ -235,6 +237,7 @@ export default function SessionPlanning({ club }: Props) {
       if (activityError) return setError(activityError.message);
     }
     resetForm();
+    autoSyncCalendar(clubId);
     load();
   };
 
@@ -317,6 +320,7 @@ export default function SessionPlanning({ club }: Props) {
     }
     setImporting(false);
     if (created.length === importPreview.sessions.length) setImportPreview(null);
+    autoSyncCalendar(clubId);
     load();
   };
 
@@ -339,6 +343,7 @@ export default function SessionPlanning({ club }: Props) {
     if (deleteError) setError(deleteError.message);
     else {
       if (editingId === plan.id) resetForm();
+      autoSyncCalendar(clubId);
       load();
     }
   };
@@ -445,6 +450,7 @@ export default function SessionPlanning({ club }: Props) {
 
   return (
     <div className="space-y-6">
+      <Timetable clubId={clubId} clubName={club.name} plans={plans} activitiesByPlan={activitiesByPlan} onOpenPlan={editPlan} />
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-bold text-slate-900">
           {editingId ? 'Edit session plan' : 'Linked session planner'}

@@ -3,8 +3,11 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
-ALTER TABLE public.coaches DROP CONSTRAINT IF EXISTS coaches_id_club_id_key;
-ALTER TABLE public.coaches ADD CONSTRAINT coaches_id_club_id_key UNIQUE (id, club_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'coaches_id_club_id_key') THEN
+    ALTER TABLE public.coaches ADD CONSTRAINT coaches_id_club_id_key UNIQUE (id, club_id);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.coach_qualifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
