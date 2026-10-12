@@ -53,6 +53,7 @@ function GradingApp({ club }: { club: Club | null }) {
   const [activeExaminerId, setActiveExaminerId] = useState<string | null>(null);
   const [savedEvals, setSavedEvals] = useState<Evaluation[]>(supabaseConfigured ? [] : demoEvaluations);
   const [loadingEvals, setLoadingEvals] = useState(supabaseConfigured);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [students, setStudents] = useState<Student[]>(supabaseConfigured ? [] : demoStudents);
@@ -280,6 +281,9 @@ function GradingApp({ club }: { club: Club | null }) {
       restoredScores = { [firstExId]: ev.scores as unknown as Record<string, Record<string, number>> };
     }
 
+    setSelectedStudent(
+      students.find((s) => s.student_name === ev.student_name && (s.email ?? s.guardian_email ?? '') === ev.candidate_id) ?? null,
+    );
     setProfile({
       studentName: ev.student_name,
       candidateId: ev.candidate_id,
@@ -308,6 +312,7 @@ function GradingApp({ club }: { club: Club | null }) {
   };
 
   const handleReset = () => {
+    setSelectedStudent(null);
     setProfile(emptyProfile);
     setExaminerScores({});
     setActiveExaminerId(null);
@@ -366,6 +371,7 @@ function GradingApp({ club }: { club: Club | null }) {
     setShowStudentForm(false);
   };
   const handleSelectStudent = (c: Student) => {
+    setSelectedStudent(c);
     setProfile({
       studentName: c.student_name,
       candidateId: c.email ?? c.guardian_email ?? '',
@@ -564,7 +570,7 @@ function GradingApp({ club }: { club: Club | null }) {
               </div>
               <div>
                 <h2 className="text-xl font-extrabold text-white sm:text-2xl">
-                  Student Record Journey
+                  Student Record
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Each examiner scores independently — results combine for a verdict against the grade's pass mark
@@ -581,7 +587,7 @@ function GradingApp({ club }: { club: Club | null }) {
           </div>
         </div>
 
-        <StudentProfileHeader data={profile} onChange={handleProfileChange} />
+        <StudentProfileHeader data={profile} student={selectedStudent} onChange={handleProfileChange} />
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
