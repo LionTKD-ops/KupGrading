@@ -3,10 +3,10 @@ import { Upload, Link2, FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Dow
 import { parseCandidatesCSV, googleSheetsURLToCSV, generateSampleCSV, type ParsedCandidate } from '@/lib/csvUtils';
 
 type Props = {
-  onImport: (candidates: ParsedCandidate[]) => void;
+  onImport: (candidates: ParsedCandidate[]) => Promise<void>;
 };
 
-type Status = 'idle' | 'parsing' | 'fetching' | 'preview' | 'error' | 'success';
+type Status = 'idle' | 'parsing' | 'fetching' | 'preview' | 'importing' | 'import-error' | 'error' | 'success';
 
 export default function CandidateImport({ onImport }: Props) {
   const [status, setStatus] = useState<Status>('idle');
@@ -78,11 +78,18 @@ export default function CandidateImport({ onImport }: Props) {
     }
   };
 
-  const handleConfirmImport = () => {
-    onImport(preview);
-    setStatus('success');
-    setPreview([]);
-    setTimeout(() => setStatus('idle'), 2000);
+  const handleConfirmImport = async () => {
+    setStatus('importing');
+    setErrorMsg('');
+    try {
+      await onImport(preview);
+      setPreview([]);
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch (error) {
+      setStatus('import-error');
+      setErrorMsg(error instanceof Error ? error.message : 'Could not import candidates. Please try again.');
+    }
   };
 
   const handleCancelPreview = () => {
@@ -124,7 +131,7 @@ export default function CandidateImport({ onImport }: Props) {
               Candidates imported successfully!
             </p>
           </div>
-        ) : status === 'preview' ? (
+        ) : status === 'preview' || status === 'importing' || status === 'import-error' ? (
           <div>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-700">
@@ -164,17 +171,27 @@ export default function CandidateImport({ onImport }: Props) {
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmImport}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:shadow-lg"
+                disabled={status === 'importing'}
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Import {preview.length} Candidate{preview.length !== 1 ? 's' : ''}
+                {status === 'importing'
+                  ? 'Importing...'
+                  : `Import ${preview.length} Candidate${preview.length !== 1 ? 's' : ''}`}
               </button>
               <button
                 onClick={handleCancelPreview}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                disabled={status === 'importing'}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
             </div>
+            {status === 'import-error' && (
+              <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3">
+                <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
+                <p className="text-sm text-red-700">{errorMsg}</p>
+              </div>
+            )}
           </div>
         ) : (
           <>

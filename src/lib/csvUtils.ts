@@ -1,4 +1,4 @@
-import { GRADES, type GradeKey } from '@/data/rubrics';
+import { GRADES } from '@/data/rubrics';
 
 export type ParsedCandidate = {
   student_name: string;
@@ -70,49 +70,51 @@ function inferTargetGrade(currentGrade: string): string {
   return higher[0]?.key ?? currentGrade;
 }
 
-// Minimal CSV parser that handles quoted fields, embedded commas, and embedded newlines
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
+function parseCSV(csvText: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
     if (inQuotes) {
       if (char === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
+        if (csvText[i + 1] === '"') {
+          field += '"';
           i++;
         } else {
           inQuotes = false;
         }
       } else {
-        current += char;
+        field += char;
       }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field.trim());
+      field = '';
+    } else if (char === '\n' || char === '\r') {
+      row.push(field.trim());
+      if (row.some((value) => value !== '')) rows.push(row);
+      row = [];
+      field = '';
+      if (char === '\r' && csvText[i + 1] === '\n') i++;
     } else {
-      if (char === '"') {
-        inQuotes = true;
-      } else if (char === ',') {
-        fields.push(current);
-        current = '';
-      } else {
-        current += char;
-      }
+      field += char;
     }
   }
-  fields.push(current);
-  return fields.map((f) => f.trim());
+
+  row.push(field.trim());
+  if (row.some((value) => value !== '')) rows.push(row);
+  return rows;
 }
 
 export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
-  const lines = csvText
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) return [];
 
-  if (lines.length < 2) return [];
-
-  const headerFields = parseCSVLine(lines[0]).map((h) => h.toLowerCase().trim());
+  const headerFields = rows[0].map((h) => h.replace(/^\uFEFF/, '').toLowerCase());
   const colMap: Record<number, keyof ParsedCandidate> = {};
 
   headerFields.forEach((header, idx) => {
@@ -127,9 +129,8 @@ export function parseCandidatesCSV(csvText: string): ParsedCandidate[] {
 
   const candidates: ParsedCandidate[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const fields = parseCSVLine(lines[i]);
-    if (fields.every((f) => f === '')) continue;
+  for (let i = 1; i < rows.length; i++) {
+    const fields = rows[i];
 
     let candidate: ParsedCandidate;
 

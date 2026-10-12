@@ -331,10 +331,9 @@ export default function App() {
     }
     const { error } = await supabase.from('candidates').insert(rows);
     if (error) {
-      setDataError(`Could not import candidates: ${error.message}`);
-    } else {
-      loadCandidates();
+      throw new Error(`Could not import candidates: ${error.message}`);
     }
+    await loadCandidates();
   };
 
   const handleSelectCandidate = (c: Candidate) => {
