@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { LogIn, Loader2, ShieldCheck, Store } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import AdminPanel from '@/components/AdminPanel';
 
 export type Club = {
   id: string;
@@ -30,11 +31,15 @@ export default function ClubAccess({ children }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     if (!supabase) return;
     const client = supabase;
-    const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = client.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       setSession(nextSession);
       setClub(null);
       setRefresh((value) => value + 1);
@@ -50,6 +55,7 @@ export default function ClubAccess({ children }: Props) {
   useEffect(() => {
     if (!supabase || !session) {
       setClub(null);
+      setIsAdmin(false);
       setBusy(false);
       return;
     }
@@ -60,6 +66,13 @@ export default function ClubAccess({ children }: Props) {
     setError('');
 
     const resolveClub = async () => {
+      const { data: adminClaim } = await client.rpc('claim_super_admin');
+      if (adminClaim === true) {
+        if (!cancelled) setIsAdmin(true);
+        return;
+      }
+      if (!cancelled) setIsAdmin(false);
+
       const { data: initialMembership, error: membershipError } = await client
         .from('club_memberships')
         .select('club_id')
@@ -191,7 +204,54 @@ export default function ClubAccess({ children }: Props) {
     if (signOutError) setError(signOutError.message);
   };
 
+  const handleForgotPassword = async () => {
+    if (!supabase) return;
+    if (!email.trim()) {
+      setError('Enter your email address first.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    if (resetError) setError(resetError.message);
+    else setMessage('If that account exists, a link to set your password has been emailed.');
+    setBusy(false);
+  };
+
+  const handleSetPassword = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    setBusy(true);
+    setError('');
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setNewPassword('');
+      setRecovery(false);
+      setMessage('Password saved.');
+    }
+    setBusy(false);
+  };
+
   if (!supabase) return null;
+  if (recovery && session) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+        <form onSubmit={handleSetPassword} className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-7 shadow-xl">
+          <h1 className="text-lg font-bold text-slate-900">Set your password</h1>
+          <input className={inputClass} type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password (at least 8 characters)" required />
+          <button disabled={busy} className="w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60">
+            Save password
+          </button>
+          {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        </form>
+      </main>
+    );
+  }
+  if (session && isAdmin && !busy) return <AdminPanel email={session.user.email ?? ''} onSignOut={handleSignOut} />;
   if (club) return <>{children(club)}</>;
 
   return (
@@ -264,6 +324,11 @@ export default function ClubAccess({ children }: Props) {
               <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white">
                 <LogIn size={16} /> {screen === 'login' ? 'Sign in' : screen === 'signup' ? 'Create club account' : 'Create account and join'}
               </button>
+              {screen === 'login' && (
+                <button type="button" onClick={handleForgotPassword} className="w-full text-sm text-slate-500 hover:text-slate-800">
+                  Set or reset password (emails you a link)
+                </button>
+              )}
             </form>
           </>
         )}
