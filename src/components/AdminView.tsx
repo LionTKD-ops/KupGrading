@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Loader2, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { BELT_SIZES, COACH_RANKS, DAN_GRADES, supabase, type Coach, type CoachQualification, type CoachRank } from '@/lib/supabase';
 import QualificationsCell from '@/components/QualificationsCell';
+import AssessmentSetup from '@/components/AssessmentSetup';
 
 type Props = {
   club: { id: string; name: string; join_code: string };
@@ -202,6 +203,8 @@ export default function AdminView({ club }: Props) {
           Staff join code: <span className="font-mono font-semibold">{club.join_code}</span>
         </p>
       </section>
+
+      <AssessmentSetup clubId={club.id} />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-bold text-slate-900">Coaches</h2>
