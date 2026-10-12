@@ -70,6 +70,14 @@ export function resolveStudentGrade(value: string): string | null {
   return STUDENT_GRADES.find((grade) => grade.key.toLowerCase() === text)?.label ?? null;
 }
 
+// The next grade up the ladder, used as the target grade. The top grade has no target.
+export function nextStudentGrade(value: string): string {
+  const label = resolveStudentGrade(value);
+  const index = STUDENT_GRADES.findIndex((grade) => grade.label === label);
+  if (index === -1) return STUDENT_GRADES[1].label;
+  return STUDENT_GRADES[Math.min(index + 1, STUDENT_GRADES.length - 1)].label;
+}
+
 export function gradeKeyFor(value: string): GradeKey {
   const label = resolveStudentGrade(value);
   return STUDENT_GRADES.find((grade) => grade.label === label)?.key ?? GRADES[0].key;
@@ -247,8 +255,8 @@ export type Verdict = {
 };
 
 // Compare the combined average against the grade band's pass mark (60% of max)
-export function getVerdict(average: number, currentGrade: GradeKey): Verdict {
-  const gradeInfo = GRADES.find((r) => r.key === currentGrade);
+export function getVerdict(average: number, currentGrade: string): Verdict {
+  const gradeInfo = GRADES.find((r) => r.key === gradeKeyFor(currentGrade));
   const maxScore = gradeInfo?.maxScore ?? 1;
   const passMark = gradeInfo?.passMark ?? maxScore * 0.6;
   const conditionalMark = maxScore * 0.5;

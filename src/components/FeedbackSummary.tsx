@@ -1,5 +1,5 @@
 import { TrendingUp, MessageSquare, Gauge, Gavel, CheckCircle2, AlertTriangle, XCircle, Users } from 'lucide-react';
-import { getFeedbackTier, getVerdict, type AssessmentModule, type GradeKey } from '@/data/rubrics';
+import { getFeedbackTier, getVerdict, type AssessmentModule } from '@/data/rubrics';
 import { scoreColorIndex } from '@/data/rubrics';
 import type { ExaminerRef } from '@/components/AssessmentModules';
 
@@ -10,7 +10,7 @@ type Props = {
   modules: AssessmentModule[];
   examinerScores: Record<string, Record<string, Record<string, number>>>;
   examiners: ExaminerRef[];
-  currentGrade: GradeKey;
+  currentGrade: string;
   maxScore: number;
   passMark: number;
 };

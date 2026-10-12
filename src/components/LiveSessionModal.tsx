@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Radio, X, Plus, LogIn, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { GRADES, type GradeKey } from '@/data/rubrics';
+import { GRADES, gradeKeyFor } from '@/data/rubrics';
 import type { ProfileData } from '@/components/StudentProfileHeader';
 
 type Props = {
@@ -55,7 +55,7 @@ export default function LiveSessionModal({ profile, clubId, onClose, onSessionCr
     setError('');
     const code = genSessionCode();
     const examinerId = genExaminerId();
-    const currentGradeInfo = GRADES.find((r) => r.key === profile.currentGrade);
+    const currentGradeInfo = GRADES.find((r) => r.key === gradeKeyFor(profile.currentGrade));
 
     const { data, error: insertError } = await supabase
       .from('assessment_sessions')

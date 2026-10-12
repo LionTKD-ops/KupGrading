@@ -21,8 +21,8 @@ const demoDate = '2026-10-12';
 export const demoProfile: ProfileData = {
   studentName: 'Alex Morgan',
   candidateId: 'DEMO-001',
-  currentGrade: '4-3 KUP',
-  targetGrade: '2-1 KUP',
+  currentGrade: '4th Kup (Blue Belt)',
+  targetGrade: '3rd Kup (Blue Belt Red Stripe)',
   examiners: [{ id: demoExaminerId, name: 'Master Lee' }],
   date: demoDate,
 };

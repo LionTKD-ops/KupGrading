@@ -1,5 +1,5 @@
 import { User, IdCard, Award, TrendingUp, ClipboardCheck, Calendar, Plus, X, Users } from 'lucide-react';
-import { GRADES, type GradeKey } from '@/data/rubrics';
+import { GRADES, gradeKeyFor, nextStudentGrade, STUDENT_GRADES } from '@/data/rubrics';
 
 export type ExaminerEntry = {
   id: string;
@@ -9,7 +9,7 @@ export type ExaminerEntry = {
 export type ProfileData = {
   studentName: string;
   candidateId: string;
-  currentGrade: GradeKey;
+  currentGrade: string;
   targetGrade: string;
   examiners: ExaminerEntry[];
   date: string;
@@ -29,12 +29,8 @@ function makeExaminerId() {
 }
 
 export default function StudentProfileHeader({ data, onChange }: Props) {
-  const currentGradeInfo = GRADES.find((r) => r.key === data.currentGrade);
-  const targetGradeOptions = GRADES.filter((r) => r.maxScore > (currentGradeInfo?.maxScore ?? 0));
-
-  const validTarget = targetGradeOptions.some((r) => r.key === data.targetGrade)
-    ? data.targetGrade
-    : (targetGradeOptions[0]?.key ?? data.targetGrade);
+  const currentGradeInfo = GRADES.find((r) => r.key === gradeKeyFor(data.currentGrade));
+  const isTopGrade = data.currentGrade === STUDENT_GRADES[STUDENT_GRADES.length - 1].label;
 
   const addExaminer = () => {
     onChange({ ...data, examiners: [...data.examiners, { id: makeExaminerId(), name: '' }] });
@@ -97,20 +93,16 @@ export default function StudentProfileHeader({ data, onChange }: Props) {
           <select
             className={inputClass}
             value={data.currentGrade}
-            onChange={(e) => {
-              const newGrade = e.target.value as GradeKey;
-              const newInfo = GRADES.find((r) => r.key === newGrade);
-              const newTargets = GRADES.filter((r) => r.maxScore > (newInfo?.maxScore ?? 0));
-              onChange({
-                ...data,
-                currentGrade: newGrade,
-                targetGrade: newTargets[0]?.key ?? newGrade,
-              });
-            }}
+            onChange={(e) =>
+              onChange({ ...data, currentGrade: e.target.value, targetGrade: nextStudentGrade(e.target.value) })
+            }
           >
-            {GRADES.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.label} — {r.band}
+            {!STUDENT_GRADES.some((r) => r.label === data.currentGrade) && (
+              <option value={data.currentGrade}>{data.currentGrade}</option>
+            )}
+            {STUDENT_GRADES.map((r) => (
+              <option key={r.label} value={r.label}>
+                {r.label}
               </option>
             ))}
           </select>
@@ -120,22 +112,14 @@ export default function StudentProfileHeader({ data, onChange }: Props) {
           <label className={labelClass}>
             <TrendingUp size={14} /> Target Grade
           </label>
-          <select
-            className={inputClass}
-            value={validTarget}
-            onChange={(e) => onChange({ ...data, targetGrade: e.target.value })}
-          >
-            {targetGradeOptions.length === 0 && (
-              <option value={data.currentGrade}>— Highest grade —</option>
-            )}
-            {targetGradeOptions.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.label} — {r.band}
-              </option>
-            ))}
-          </select>
+          <input
+            type="text"
+            readOnly
+            className={`${inputClass} bg-slate-50 text-slate-600`}
+            value={isTopGrade ? 'Highest grade' : data.targetGrade}
+            title="Set automatically to the next grade in the sequence"
+          />
         </div>
-
         <div className="sm:col-span-1">
           <label className={labelClass}>
             <Calendar size={14} /> Date
@@ -197,7 +181,7 @@ export default function StudentProfileHeader({ data, onChange }: Props) {
       {currentGradeInfo && (
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl bg-gradient-to-r from-slate-50 to-amber-50/50 px-4 py-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Assessment Band
+            Training Band
           </span>
           <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
             {currentGradeInfo.band}

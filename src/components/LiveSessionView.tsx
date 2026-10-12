@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Radio, X, Copy, Check, Users, Wifi, WifiOff, TrendingUp, MessageSquare, Gauge, Gavel, CheckCircle2, AlertTriangle, XCircle, Save, Loader2, Zap, Grid3x3, Swords, Target } from 'lucide-react';
 import { supabase, type AssessmentSession, type SessionScore } from '@/lib/supabase';
-import { buildModules, getFeedbackTier, getVerdict, GRADES, scoreColorIndex, type AssessmentModule, type GradeKey } from '@/data/rubrics';
+import { buildModules, getFeedbackTier, getVerdict, GRADES, gradeKeyFor, scoreColorIndex, type AssessmentModule } from '@/data/rubrics';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
 import type { ExaminerScores } from '@/lib/supabase';
 import type { ProfileData } from '@/components/StudentProfileHeader';
@@ -143,8 +143,8 @@ export default function LiveSessionView({
   }, [sessionId, myExaminerId, myExaminerName, clubId]);
 
   const maxScore = session?.target_mark ?? 1;
-  const currentGrade = (session?.current_rank ?? '10-9 KUP') as GradeKey;
-  const gradeInfo = GRADES.find((r) => r.key === currentGrade);
+  const currentGrade = session?.current_rank ?? '10th Kup (White Belt)';
+  const gradeInfo = GRADES.find((r) => r.key === gradeKeyFor(currentGrade));
   const passMark = gradeInfo?.passMark ?? maxScore * 0.6;
   const modules = useMemo(() => buildModules(maxScore), [maxScore]);
   const totalItems = useMemo(() => modules.reduce((sum, m) => sum + m.items.length, 0), [modules]);

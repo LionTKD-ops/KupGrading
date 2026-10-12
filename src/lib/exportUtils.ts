@@ -1,6 +1,6 @@
 import type { ProfileData } from '@/components/StudentProfileHeader';
 import type { ExaminerScores } from '@/lib/supabase';
-import { buildModules, getFeedbackTier, getVerdict, GRADES, scoreColorIndex } from '@/data/rubrics';
+import { buildModules, getFeedbackTier, getVerdict, GRADES, gradeKeyFor, scoreColorIndex } from '@/data/rubrics';
 
 type ExportData = {
   profile: ProfileData;
@@ -12,7 +12,7 @@ type ExportData = {
 
 export function exportCSV(data: ExportData) {
   const { profile, examinerScores, combinedAverage } = data;
-  const gradeInfo = GRADES.find((r) => r.key === profile.currentGrade);
+  const gradeInfo = GRADES.find((r) => r.key === gradeKeyFor(profile.currentGrade));
   const maxScore = gradeInfo?.maxScore ?? 1;
   const passMark = gradeInfo?.passMark ?? maxScore * 0.6;
   const modules = buildModules(maxScore);
@@ -82,7 +82,7 @@ export function exportCSV(data: ExportData) {
 
 export function exportPDF(data: ExportData) {
   const { profile, examinerScores, combinedAverage, scoredItems, totalItems } = data;
-  const gradeInfoPdf = GRADES.find((r) => r.key === profile.currentGrade);
+  const gradeInfoPdf = GRADES.find((r) => r.key === gradeKeyFor(profile.currentGrade));
   const maxScorePdf = gradeInfoPdf?.maxScore ?? 1;
   const passMarkPdf = gradeInfoPdf?.passMark ?? maxScorePdf * 0.6;
   const modules = buildModules(maxScorePdf);

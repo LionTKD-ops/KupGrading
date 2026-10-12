@@ -14,7 +14,7 @@ import LiveSessionView from '@/components/LiveSessionView';
 import AdminView from '@/components/AdminView';
 import SessionPlanning from '@/components/SessionPlanning';
 import { supabase, supabaseConfigured, type Evaluation, type Student, type StudentInput, type ExaminerScores } from '@/lib/supabase';
-import { buildModules, GRADES, getFeedbackTier, getVerdict, gradeKeyFor } from '@/data/rubrics';
+import { buildModules, GRADES, getFeedbackTier, getVerdict, gradeKeyFor, nextStudentGrade, resolveStudentGrade, STUDENT_GRADES } from '@/data/rubrics';
 import { demoStudents, demoEvaluations, demoExaminerScores, demoProfile } from '@/data/demoData';
 import { exportPDF, exportCSV } from '@/lib/exportUtils';
 import type { ParsedStudent } from '@/lib/csvUtils';
@@ -32,15 +32,10 @@ const today = new Date().toISOString().split('T')[0];
 const emptyProfile: ProfileData = {
   studentName: '',
   candidateId: '',
-  currentGrade: '10-9 KUP',
-  targetGrade: '8-7 KUP',
+  currentGrade: STUDENT_GRADES[0].label,
+  targetGrade: STUDENT_GRADES[1].label,
   examiners: [{ id: 'ex-1', name: '' }],
   date: today,
-};
-
-const nextGrade = (current: string) => {
-  const index = GRADES.findIndex((grade) => grade.key === gradeKeyFor(current));
-  return GRADES[Math.min(index + 1, GRADES.length - 1)]?.key ?? current;
 };
 
 export default function App() {
@@ -69,7 +64,7 @@ function GradingApp({ club }: { club: Club | null }) {
   const [liveSession, setLiveSession] = useState<LiveSessionState>(null);
   const [view, setView] = useState<'assessment' | 'students' | 'planning' | 'admin'>(club ? 'admin' : 'assessment');
 
-  const currentGradeInfo = GRADES.find((r) => r.key === profile.currentGrade);
+  const currentGradeInfo = GRADES.find((r) => r.key === gradeKeyFor(profile.currentGrade));
   const maxScore = currentGradeInfo?.maxScore ?? 1;
   const passMark = currentGradeInfo?.passMark ?? maxScore * 0.6;
   const modules = useMemo(
@@ -148,7 +143,7 @@ function GradingApp({ club }: { club: Club | null }) {
 
   const handleProfileChange = useCallback(
     (data: ProfileData) => {
-      if (data.currentGrade !== profile.currentGrade) {
+      if (gradeKeyFor(data.currentGrade) !== gradeKeyFor(profile.currentGrade)) {
         setExaminerScores({});
       }
       setProfile(data);
@@ -288,7 +283,7 @@ function GradingApp({ club }: { club: Club | null }) {
     setProfile({
       studentName: ev.student_name,
       candidateId: ev.candidate_id,
-      currentGrade: ev.current_rank as ProfileData['currentGrade'],
+      currentGrade: resolveStudentGrade(ev.current_rank) ?? ev.current_rank,
       targetGrade: ev.target_rank,
       examiners,
       date: ev.evaluation_date,
@@ -374,8 +369,8 @@ function GradingApp({ club }: { club: Club | null }) {
     setProfile({
       studentName: c.student_name,
       candidateId: c.email ?? c.guardian_email ?? '',
-      currentGrade: gradeKeyFor(c.current_rank),
-      targetGrade: nextGrade(c.current_rank),
+      currentGrade: resolveStudentGrade(c.current_rank) ?? STUDENT_GRADES[0].label,
+      targetGrade: nextStudentGrade(c.current_rank),
       examiners: [{ id: 'ex-1', name: '' }],
       date: today,
     });
@@ -569,7 +564,7 @@ function GradingApp({ club }: { club: Club | null }) {
               </div>
               <div>
                 <h2 className="text-xl font-extrabold text-white sm:text-2xl">
-                  Multi-Examiner Grading Assessment
+                  Student Record Journey
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Each examiner scores independently — results combine for a verdict against the grade's pass mark
@@ -579,7 +574,7 @@ function GradingApp({ club }: { club: Club | null }) {
             <div className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 backdrop-blur-sm">
               <Award size={18} className="text-amber-400" />
               <div className="text-xs">
-                <div className="font-semibold text-white">{currentGradeInfo?.band}</div>
+                <div className="font-semibold text-white">Training band: {currentGradeInfo?.band}</div>
                 <div className="text-slate-400">Max {maxScore} · Pass {passMark.toFixed(1)}</div>
               </div>
             </div>
